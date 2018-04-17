@@ -1,13 +1,35 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(bifoiler_state_estimator)
 
+# add local cmake/ directory to module path
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH};${PROJECT_SOURCE_DIR}/cmake)
 
 # Compiler flags
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall")
 SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
 
 # Libraries
+find_package(casadi REQUIRED)
 find_package(yaml-cpp 0.6 REQUIRED)
+
+link_directories(
+    $ENV{CASADI_PREFIX}
+    )
+
+include_directories(
+    ./
+    ${CASADI_INCLUDE_DIR}
+    )
+
+add_executable(
+    casadi_test
+    test/casadi_test.cpp
+    )
+
+target_link_libraries(
+    casadi_test
+    casadi
+    )
 
 add_executable(
     config_test
