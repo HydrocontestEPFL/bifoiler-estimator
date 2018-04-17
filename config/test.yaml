@@ -1,0 +1,24 @@
+name: "Bifoiler"
+geometry:
+  front_foil:
+    position:     [0, 0, 1]     # [m]
+  back_foil:
+    position:     [-1, 0, 0.5]  # [m]
+inertia:
+  mass:           20.0          # [kg]
+  Ixx:            0.1           # [kg * m2]
+  Iyy:            2.0           # [kg * m2]
+  Izz:            1.0           # [kg * m2]
+hydrodynamics:
+  CL0:            0.1278        # [?]
+  # ...
+sensors:
+  XSENS:
+    position:     [1, 0, 0.1]   # [m]
+    orientation:  [0, 0, 0]     # [rad]
+  pixracer:
+    position:     [1, 0, 0.1]   # [m]
+    orientation:  [0, 0, 0]     # [rad]
+  GPS:
+    position:     [1, 0, 0.1]   # [m]
+    orientation:  [0, 0, 0]     # [rad]
