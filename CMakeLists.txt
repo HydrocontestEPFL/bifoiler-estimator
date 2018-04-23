@@ -40,3 +40,14 @@ target_link_libraries(
     config_test
     yaml-cpp
     )
+
+add_executable(
+    hydrodynamics
+    src/hydrodynamics.cpp
+    )
+
+target_link_libraries(
+    hydrodynamics
+    casadi
+    yaml-cpp
+    )
