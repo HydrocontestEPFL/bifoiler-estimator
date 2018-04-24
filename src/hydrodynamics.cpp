@@ -248,6 +248,13 @@ void BoatHydrodynamics(const BoatProperties &prop)
     // Angular motion equation in BRF
     SX Mhvrf = SX::vertcat({L, M, N});
     SX Mhbrf = quatrot(q_BV, Mhvrf);
+    
+    SX state    = SX::vertcat({v,w});
+    SX control  = SX::vertcat({...});
+    SX dynamics = SX::vertcat({Fhbrf,Mhbrf});
+    
+    Function dynamics = Function("dynamics",{state,control},{dynamics});
+    dynamics.generate();
 
     std::cout << Fhbrf << std::endl;
     std::cout << Mhbrf << std::endl;
