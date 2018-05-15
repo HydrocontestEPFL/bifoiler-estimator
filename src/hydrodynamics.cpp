@@ -71,7 +71,25 @@ struct BoatProperties
     } hydrodynamic;
 };
 
-BoatProperties LoadProperties(const std::string &filename)
+class BoatDynamics
+{
+public:
+    casadi::SX State;
+    casadi::SX Control;
+    casadi::SX SymDynamics;
+    casadi::SX SymIntegartor;
+    casadi::SX SymJacobian;
+
+    casadi::Function NumDynamics;
+    casadi::Function NumIntegrator;
+    casadi::Function NumJacobian;
+
+    BoatDynamics(const BoatProperties &boat_prop);
+    static void Hydrodynamics(SX &state, SX &control, const BoatProperties &prop, SX &Fhbrf, SX &Mhbrf, SX &aoa, SX &ssa);
+    static BoatProperties LoadProperties(const std::string &filename);
+};
+
+BoatProperties BoatDynamics::LoadProperties(const std::string &filename)
 {
     YAML::Node config = YAML::LoadFile(filename);
 
@@ -145,7 +163,7 @@ SX quatrot(const SX &q, const SX &r)
     return qrr(Slice(1,4));
 }
 
-void BoatHydrodynamics(const BoatProperties &prop)
+void BoatDynamics::Hydrodynamics(SX &state, SX &control, const BoatProperties &prop, SX &Fhbrf, SX &Mhbrf, SX &aoa, SX &ssa)
 {
     double rho = prop.env.rho_sh2o;
     double AR  = prop.foils.ARff;        // [-], Aspect Ratio (Flügelstreckung)
@@ -189,23 +207,21 @@ void BoatHydrodynamics(const BoatProperties &prop)
     double Cndr        = prop.hydrodynamic.CNdr;
 
     // State variables definition
-    SX v = SX::sym("v", 3); // Translational Velocity/Attitude towards Velocity Reference Frame
-    // SX v = SX::vertcat(state(Slice(0,3)));
-    SX W = SX::sym("W", 3); // Rotational Rate/Attitude Derivative
-    // SX W = state(Slice(3,6));
+    SX v = state(Slice(0,3)); // Translational Velocity/Attitude towards Velocity Reference Frame
+    SX W = state(Slice(3,6)); // Rotational Rate/Attitude Derivative
 
     // Control variables definition
-    SX dF = SX::sym("dF"); // Flaps
-    SX dA = SX::sym("dA"); // Aileron
-    SX dR = SX::sym("dR"); // Rudder
-    SX dE = SX::sym("dE"); // Elevator
+    SX dF = control(0); // Flaps
+    SX dA = control(1); // Aileron
+    SX dR = control(2); // Rudder
+    SX dE = control(3); // Elevator
 
     // Variables and Orientation
     const double v1_eps   = 0.0001;    // Enable v(1)_0 = 0 w/o getting NaN
     SX V = SX::norm_2(v)+ v1_eps;        // Absolute Value of Velocity
 
-    SX ssa = asin(v(1) / V);               // side slip angle [rad]
-    SX aoa = atan2(v(2) , v(0) + v1_eps);  // angle of attack definition [rad]
+    ssa = asin(v(1) / V);               // side slip angle [rad]
+    aoa = atan2(v(2) , v(0) + v1_eps);  // angle of attack definition [rad]
 
     SX dyn_press = 0.5 * rho * pow(V,2);  // dynamic pressure
 
@@ -227,7 +243,8 @@ void BoatHydrodynamics(const BoatProperties &prop)
     // Y  = (CYb * ssa + CYp*W(1) + CYr* W(3) + CYdr * dR)*Q*V^2
     SX SF = (CYb * ssa + CYdr*dR) * dyn_press * S + 0.25 * (CYr * W(2) + CYp * W(0)) * (b * rho * S) * V;
 
-    SX Fhbrf = quatrot(q_BV, SX::vertcat({-DRAG, 0, -LIFT})) + SX::vertcat({0, SF, 0}); // why is SF already in brf?
+    // Force return value
+    Fhbrf = quatrot(q_BV, SX::vertcat({-DRAG, 0, -LIFT})) + SX::vertcat({0, SF, 0}); // why is SF already in brf?
 
     // Moments
     // Rolling Aerodynamic Moment
@@ -247,20 +264,73 @@ void BoatHydrodynamics(const BoatProperties &prop)
 
     // Angular motion equation in BRF
     SX Mhvrf = SX::vertcat({L, M, N});
-    SX Mhbrf = quatrot(q_BV, Mhvrf);
-    
-    SX state    = SX::vertcat({v,w});
-    SX control  = SX::vertcat({...});
-    SX dynamics = SX::vertcat({Fhbrf,Mhbrf});
-    
-    Function dynamics = Function("dynamics",{state,control},{dynamics});
-    dynamics.generate();
 
-    std::cout << Fhbrf << std::endl;
-    std::cout << Mhbrf << std::endl;
+    // Moment return value
+    Mhbrf = quatrot(q_BV, Mhvrf);
+}
+
+BoatDynamics::BoatDynamics(const BoatProperties &prop)
+{
+#if 0
+    SX Fhbrf;
+    SX Mhbrf;
+    Hydrodynamics(prop, state, control, Fhbrf, Mhbrf);
+
+    SX Fbrf = Fhbrf; // + ...
+    SX Mbrf = Fhbrf; // + ...
+
+    // State and Control variables
+    SX v    = SX.sym("v", 3);   // [m/s] translational velocity of the CoG in BRF
+    SX W    = SX.sym("W", 3);   // [rad/s] angular velocities of boat in BRF
+    SX r    = SX.sym("r", 3);   // [m] position of the CoG in IRF
+    SX q_BI = SX.sym("q", 4);   // unit quaternion for transformation from IRF to BRF
+
+    SX dF   = SX.sym("dF");     // Flaps
+    SX dA   = SX.sym("dA");     // Aileron deflection [reserved, but not used] [rad]
+    SX dR   = SX.sym("dR");     // Rudder deflection [rad]
+    SX dE   = SX.sym("dE");     // Elevator deflection [positive down] [rad]
+
+    // todo
+    v_dot_brf = Fbrf/mtot  - cross(W,v);
+    W_dot_brf = quatrot(quatinv(q_BI),v_dot_brf);
+    qv        = quatmul(q_BI, [0; v]);
+    qv_q      = quatmul(qv, quatinv(q_BI));
+    r_dot_irf = qv_q(2:4);
+    q_BI_dot  = 0.5 * quatmul(q_BI, [0;W]);
+
+    SX state    = SX::vertcat({v, W, r, q_BI});
+    SX control  = SX::vertcat({dF, dA, dR, dE});
+    SX dynamics = SX::vertcat({v_dot_brf, W_dot_brf, r_dot_irf, q_BI_dot});
+
+    dynamics_func = Function("dynamics", {state,control}, {dynamics});
+    jacobian = dynamics_func.jacobian(state);
+    jacobian_func = Function('jacobian', {state, control}, {jacobian});
+
+    /** define RK4 integrator scheme */
+    SX X = SX::sym("X", 13);
+    SX U = SX::sym("U", 3);
+    SX dT = SX::sym("dT");
+
+    /** get symbolic expression for RK4 integrator */
+    SX integrator = kmath::rk4_symbolic(X, U, dynamics_func, dT);
+    Function integrator_func = Function("RK4", {X,U,dT},{sym_integrator});
+
+    /* assign class attributes */
+    this->State = state;
+    this->Control = control;
+
+    this->SymDynamics = dynamics;
+    this->SymIntegartor = integrator;
+
+    this->NumDynamics = dynamics_func;
+    this->NumJacobian = jacobian_func;
+    this->NumIntegrator = integrator_func;
+#endif
 }
 
 } // namespace bifoiler
+
+using namespace bifoiler;
 
 int main(int argc, char *argv[])
 {
@@ -270,6 +340,23 @@ int main(int argc, char *argv[])
     }
 
     std::string config_file(argv[1]);
-    auto prop = bifoiler::LoadProperties(config_file);
-    bifoiler::BoatHydrodynamics(prop);
+    auto prop = BoatDynamics::LoadProperties(config_file);
+
+    SX v    = SX::sym("v", 3);   // [m/s] translational velocity of the CoG in BRF
+    SX W    = SX::sym("W", 3);   // [rad/s] angular velocities of boat in BRF
+    SX r    = SX::sym("r", 3);   // [m] position of the CoG in IRF
+    SX q_BI = SX::sym("q", 4);   // unit quaternion for transformation from IRF to BRF
+    SX state    = SX::vertcat({v, W, r, q_BI});
+
+    SX dF   = SX::sym("dF");     // Flaps
+    SX dA   = SX::sym("dA");     // Aileron deflection [reserved, but not used] [rad]
+    SX dR   = SX::sym("dR");     // Rudder deflection [rad]
+    SX dE   = SX::sym("dE");     // Elevator deflection [positive down] [rad]
+    SX control  = SX::vertcat({dF, dA, dR, dE});
+
+    SX Fhbrf, Mhbrf, aoa, ssa;
+
+    BoatDynamics::Hydrodynamics(state, control, prop, Fhbrf, Mhbrf, aoa, ssa);
+
+    std::cout << Fhbrf << "\n" << Mhbrf << "\n" << aoa << "\n" << ssa << "\n";
 }
