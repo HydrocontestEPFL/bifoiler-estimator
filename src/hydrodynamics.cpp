@@ -86,6 +86,7 @@ public:
 
     BoatDynamics(const BoatProperties &boat_prop);
     static void Hydrodynamics(SX &state, SX &control, const BoatProperties &prop, SX &Fhbrf, SX &Mhbrf, SX &aoa, SX &ssa);
+    static void Propulsion(const BoatProperties &prop, SX &Ftbrf, SX &Mtbrf)
     static BoatProperties LoadProperties(const std::string &filename);
 };
 
@@ -269,15 +270,38 @@ void BoatDynamics::Hydrodynamics(SX &state, SX &control, const BoatProperties &p
     Mhbrf = quatrot(q_BV, Mhvrf);
 }
 
+void BoatDynamics::Propulsion(const BoatProperties &prop, SX &Ftbrf, SX &Mtbrf)
+{
+    // TODO: move constants into BoatProperties
+
+    // propmode: "endurance"
+    // double Ftbrfx = 71;   // [N] in the Steady State
+    // double Mtbrfx = 6.18; // [Nm], optimal torque (qopt). Prop rotates cw wrt brf_x => reaction
+
+    // propmode: "speed"
+    double Ftbrfx = 93;   // [N] in the Steady State
+    double Mtbrfx = 4.77; // [Nm], optimal torque (qopt). Prop rotates cw wrt brf_x => reaction
+    Ftbrf = SX::vertcat({Ftbrfx, 0, 0});
+
+    // Parasite/Reaction Torque: Moment around y due to thrust
+    // d_prop_vec = [0.6766 0.7716 0.8666]
+    // boat_sims.cbdepth = 1
+    // double d_prop_cog = d_prop_vec(boat_sims.cbdepth);
+    double d_prop_cog = 0.7716;
+    double Mrbrf = d_prop_cog*Ftbrfx;
+
+    Mtbrf = SX::vertcat({Mtbrfx, Mrbrf, 0});
+}
+
 BoatDynamics::BoatDynamics(const BoatProperties &prop)
 {
 #if 0
-    SX Fhbrf;
-    SX Mhbrf;
-    Hydrodynamics(prop, state, control, Fhbrf, Mhbrf);
+    double g = boat_pm.env.g;
+    double mtot = boat_pm.inertia.mass;
 
-    SX Fbrf = Fhbrf; // + ...
-    SX Mbrf = Fhbrf; // + ...
+    // TODO
+    // Jbrf = [boat_pm.Ixx boat_pm.Ixy boat_pm.Ixz; boat_pm.Ixy boat_pm.Iyy boat_pm.Iyz; boat_pm.Ixz boat_pm.Iyz boat_pm.Izz]; %[kg m^2], inertial tensor
+    // Jbrf = Jbrf./boat_pm.mtot_cad*mtot;              % Until better values: make boat uniformly heavier/inert
 
     // State and Control variables
     SX v    = SX.sym("v", 3);   // [m/s] translational velocity of the CoG in BRF
@@ -290,16 +314,48 @@ BoatDynamics::BoatDynamics(const BoatProperties &prop)
     SX dR   = SX.sym("dR");     // Rudder deflection [rad]
     SX dE   = SX.sym("dE");     // Elevator deflection [positive down] [rad]
 
-    // todo
-    v_dot_brf = Fbrf/mtot  - cross(W,v);
-    W_dot_brf = quatrot(quatinv(q_BI),v_dot_brf);
-    qv        = quatmul(q_BI, [0; v]);
-    qv_q      = quatmul(qv, quatinv(q_BI));
-    r_dot_irf = qv_q(2:4);
-    q_BI_dot  = 0.5 * quatmul(q_BI, [0;W]);
-
     SX state    = SX::vertcat({v, W, r, q_BI});
     SX control  = SX::vertcat({dF, dA, dR, dE});
+
+    // Gravity
+    SX Fgbrf = quatrot(q_BI, SX::vertcat({0,0,g}))
+
+    // Propulsion
+    SX Ftbrf, Mtbrf;
+    Propulsion(prop, Ftbrf, Mtbrf);
+
+    // Hydrodynamics
+    SX Fhbrf, Mhbrf;
+    Hydrodynamics(prop, state, control, Fhbrf, Mhbrf);
+
+    // Buoyancy
+    // SX Fbbrf, Mbbrf;
+    // TODO
+
+    // Damping
+    Df = SX::diag({-10, -20, -5});
+    Fdbrf = Df*v;
+
+    Dm = SX::diag({-2000, -800, -300});
+    Mdbrf = Dm*W;
+
+
+    SX Fbrf = Fhbrf + Ftbrf + Fgbrf; // + Fbbrf
+    SX Mbrf = Mhbrf + Mtbrf; // + ...
+
+    // Boat translational velocity in BRF
+    v_dot_brf = Fbrf/mtot - cross(W,v);
+
+    // Boat roataional velocity in BRF
+    W_dot_brf = inv(Jbrf) * (Mbrf - cross(W, Jbrf * W));
+
+    // Dynamic Equations: Kinematics
+    qv        = quatmul(q_BI, SX::vertcat({0; v}));
+    qv_q      = quatmul(qv, quatinv(q_BI));
+    r_dot_irf = qv_q(SX::Slice(1:4));
+    q_BI_dot  = 0.5 * quatmul(q_BI, SX::vertcat({0,W}));
+
+    // Differential equation
     SX dynamics = SX::vertcat({v_dot_brf, W_dot_brf, r_dot_irf, q_BI_dot});
 
     dynamics_func = Function("dynamics", {state,control}, {dynamics});
