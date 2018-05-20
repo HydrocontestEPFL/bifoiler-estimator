@@ -1,0 +1,81 @@
+# parameters taken from boat_pm_struct.m from Martin Schwendener
+
+name: "Bifoiler"
+
+# Environment
+env:
+  rho_sh2o:             1025      #[kg m^-3] average sea water density at surface
+  g:                    9.81      #[ms^-2]
+
+sensor:
+  r_ant:                [0,0,0]   #[m] GNS antenna position to CoG
+
+inertia:
+  # Global Values
+  mass:                 47.071   #[kg]
+  mass_cad:             31.111   #[kg] CAD value
+
+  # These values are with respect to the COG of the whole boat. Assumption:
+  # the boat is the foils, the rudder and a pointmass.
+  Ibxx_xflr5:           0.9102   #[kgm^2]
+  Ibyy_xflr5:           5.556    #[kgm^2]
+  Ibzz_xflr5:           4.845    #[kgm^2]
+  Ibxz_xflr5:           1.068    #[kgm^2]
+
+  # Inertial Tensor of the boat with weights. Val's from CAD
+  # Boat mass is 31.11 kg
+
+  # Due to some modelling error in the cad, the assembly is not perfectly
+  # symmetrical. Since it should be wrt to surf y: 0, set Ixy and Iyz to zero
+  Ixy:                  0 #-0.038 #[kgm^2]
+  Ixz:                  -0.866    #[kgm^2]
+  Iyz:                  0 #-0.066 #[kgm^2]
+
+  Ixx:                  5.083     #[kgm^2]
+  Iyy:                  11.618    #[kgm^2]
+  Izz:                  6.963     #[kgm^2]
+
+foils:
+  # front foil
+  ARff:                 13.631  #[-], Aspect Ratio (Flügelstreckung)
+  areaff:               0.089   #[m^2], Frontfoil Wing area
+  mac:                  0.083   #[m], Mean aerodynamic chord
+  wingspanff:           1.1     #[m]
+
+hydrodynamic:
+  CL0:                  0.1278
+  CLa_total:            7.8846
+  e_oswald:             0.985
+  CD0_total:            0.016      # before: 9.226
+  CYb:                  0.73389    # -3.3039
+
+  Cm0:                  0.0738
+  Cma:                  30.968     # !!!
+
+  Cn0:                  0
+  Cnb:                  0.97898    # 4.4534
+
+  Cl0:                  0
+  Clb:                  0.37912    # 1.0731
+
+  CLq:                  103.32
+  Cmq:                  2216       # -2212.8
+
+  CYr:                  2.0261     #  9.2322
+  Cnr:                  2.7004     # -12.45
+  Clr:                  1.0025     # -2.943
+
+  CYp:                  0.828      #  2.3851
+  Clp:                  1.172      # -1.638
+  Cnp:                  1.13       # -3.2298
+
+  CXdf:                 0.09823
+  CYdr:                 0.1121
+  CZde:                 0 # -3.25  # Lift,: CZ in log
+  CZdf:                 3.27
+  CLda:                 0.1412     # Roll,: CL in log, aileron
+  CLdr:                 0.1235     # Wild Guess, maybe can dig it out from fin log file...
+  CMde:                 0 # -55.889;
+  CMdf:                 17.492
+  CNda:                 0.1193
+  CNdr:                 12.396     # Cnr, have no control derivatives
