@@ -39,8 +39,7 @@ public:
 MEKF::SysState MEKF::get_system_state()
 {
     SysState xs;
-    xs.block<4,1>(9,0) = qref;
-    xs.block<9,1>(0,0) = x.block<9,1>(0,0);
+    xs << x.block<9,1>(0,0), qref;
     return xs;
 }
 
@@ -76,20 +75,20 @@ void MEKF::MEKF()
 
 void MEKF::predict(const Control &u)
 {
-    SysState x_sys, x_sys_p
+    Eigen::Matrix<Scalar, nx, nx> F;
+    SysState x_sys;
+
     x_sys = get_system_state();
 
     // numerical integration
-    x_sys_p = Dynamics.integrate(x_sys, u);
+    x_sys = Dynamics.integrate(x_sys, u);
 
     F = f.jacobian(x, u, qref);
 
-    State xe_p;
-    xe_p.block<9,1>(0,0) = x_sys_p.block<9,1>(0,0);
-    xe_p.block<9,1>(9,0) = F.block<9,18>(9,0)*x;
+    x << x_sys.block<9,1>(0,0), F.block<9,18>(9,0)*x
 
     // Covariance prediction
-    StateCov P_p = F * P * F.transpose() + f.Q;
+    P = F * P * F.transpose() + f.Q;
 }
 
 void MEKF::correct(const Measurement &z)
@@ -98,18 +97,18 @@ void MEKF::correct(const Measurement &z)
     Eigen::Matrix<Scalar, nz, nx> H;    // jacobian of h
     Eigen::Matrix<Scalar, nx, nx> IKH;  // temporary matrix
 
-    H = h.jacobian(xe_p, u, qref);
-    S = H * P_p * H.transpose() + h.R;
+    H = h.jacobian(x, u, qref);
+    S = H * P * H.transpose() + h.R;
 
     // efficiently compute: K = P * H.transpose() * S.inverse();
-    K = S.llt().solve(H * P_p).transpose();
+    K = S.llt().solve(H * P).transpose();
 
     y = z - h(x);
     IKH = (I - K * H);
 
     // Measurement update
-    x = xe_p + K * y;
-    P = IKH * P_p * IKH.transpose() + K * h.R * K.transpose();
+    x = x + K * y;
+    P = IKH * P * IKH.transpose() + K * h.R * K.transpose();
 
     // Attitude error transfer to reference quaternion qref
     Matrix<Scalar, 3, 1> a;
