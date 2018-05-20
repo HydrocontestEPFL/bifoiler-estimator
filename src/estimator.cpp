@@ -1,10 +1,11 @@
 #include <Eigen/Dense>
+#include <Eigen/Geometry>
 
 namespace bifoiler {
 
 class MEKF<typename Dynamics, typename Observation> {
 public:
-    using Scalar = typename Scalar;
+    using Scalar = typename Dynamics::State::Scalar;
     using State = Eigen::Matrix<Scalar, 18, 1>; // [v, w, r, a, bg, ba];
     using SysState = Eigen::Matrix<Scalar, 13, 1>; // [v, w, r, q_BI];
     using Control = typename Dynamics::Control;
@@ -32,6 +33,9 @@ private:
 
 public:
     SysState get_system_state();
+
+    void predict(const Control &u);
+    void correct(const Measurement &z);
     void update(const Control &u, const Measurement &z);
 
 };
@@ -43,11 +47,27 @@ MEKF::SysState MEKF::get_system_state()
     return xs;
 }
 
+MEKF::Quaternion MEKF::quatmul(const MEKF::Quaternion &q1, const MEKF::Quaternion &q2)
+{
+    Quaternion q;
+
+    Scalar s1 = q1(0);
+    Vector3 v1 = q1.block<3,1>(1,0);
+
+    Scalar s2 = q2(0);
+    Vector3 v2 = q2.block<3,1>(1,0);
+
+    Vector3 v = vx.cross(v2) + s1 * v2 + s2 * v1;
+    Scalar s = s1*s2 - v1.dot(v2);
+
+    q << s, v;
+    return q;
+}
+
 MEKF::Quaternion MEKF::_quat_error_mul(const MEKF::Vector3 &a,
                                         const MEKF::Quaternion &qr)
 {
     Quaternion dq;
-    Quaternion q;
 
     // Factor
     const Scalar f = 1;
@@ -63,9 +83,7 @@ MEKF::Quaternion MEKF::_quat_error_mul(const MEKF::Vector3 &a,
     dq *= f;
 
     // Erroneous Quaternion
-    q = quatmul(dq, qr);
-
-    return q;
+    return quatmul(dq, qr);
 }
 
 void MEKF::MEKF()
@@ -81,7 +99,7 @@ void MEKF::predict(const Control &u)
     x_sys = get_system_state();
 
     // numerical integration
-    x_sys = Dynamics.integrate(x_sys, u);
+    x_sys = f.integrate(x_sys, u);
 
     F = f.jacobian(x, u, qref);
 
@@ -96,6 +114,7 @@ void MEKF::correct(const Measurement &z)
     Measurement y;                      // innovation
     Eigen::Matrix<Scalar, nz, nx> H;    // jacobian of h
     Eigen::Matrix<Scalar, nx, nx> IKH;  // temporary matrix
+    Vector3 a;                          // attitude error
 
     H = h.jacobian(x, u, qref);
     S = H * P * H.transpose() + h.R;
@@ -111,7 +130,6 @@ void MEKF::correct(const Measurement &z)
     P = IKH * P * IKH.transpose() + K * h.R * K.transpose();
 
     // Attitude error transfer to reference quaternion qref
-    Matrix<Scalar, 3, 1> a;
     a = x.block<3,1>(9,0);
     qref = _quat_error_mul(a, qref);
 
