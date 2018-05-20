@@ -2,7 +2,7 @@
 
 namespace bifoiler {
 
-class MEKF<typename Scalar> {
+class MEKF<typename Dynamics, typename Observation> {
 public:
     using Scalar = typename Scalar;
     using State = Eigen::Matrix<Scalar, 18, 1>; // [v, w, r, a, bg, ba];
@@ -11,6 +11,7 @@ public:
     using Measurement = typename Observation::Measurement;
     using StateCov = Eigen::Matrix<Scalar, State::RowsAtCompileTime, State::RowsAtCompileTime>;
     using Quaternion = Eigen::Matrix<Scalar, 4, 1>; // [w, x, y, z];
+    using Vector3 = const Eigen::Matrix<Scalar, 3, 1>;
     enum {
         nx = State::RowsAtCompileTime,
         nz = Measurement::RowsAtCompileTime,
@@ -26,169 +27,106 @@ private:
     Eigen::Matrix<Scalar, nx, nz> K; // Kalman gain
     Eigen::Matrix<Scalar, nx, nx> I; // identity
 
-    static SysState _to_system_state(const State &x)
-    {
-        SysState x_sys;
-        x_sys.block<9,1>(0,0) = x.block<9,1>(0,0);
-        Matrix<Scalar, 3, 1> a;
-        Matrix<Scalar, 4, 1> q, qref;
-        a = x.block<3,1>(9,0);
-        // qref = x.block<4,1>(9,0)
-        q = _quat_error_mult(a, qref);
-        q = quatnormalize(q);
-        x_sys.block<4,1>(9,0) = q;
-    }
+    Quaternion _quat_error_mult(const Vector3 &a,
+                                const Quaternion &qr);
 
 public:
+    SysState get_system_state();
     void update(const Control &u, const Measurement &z);
 
 };
 
-/*
-
-function [q, eta] = quat_error_mult(a,qr)
-
-
-% Factor
-f             = 1;
-
-% Scalar Part
-% eta         = 1;
-eta           = 1 - norm(a)^2/8;
-
-%Vector Part
-% nu          = a;
-nu            = a/2;
-
-% Error Parametrisation
-dq          = f*[eta; nu];
-
-%Erroneous Quaternion
-q           = quatmul(dq,qr);
-
-q           = q/norm(q);
-*/
-
-/*
-%% (M)EKF dynamics/ Composition of total Jacobian
-
-% Model Jacobian to get linearized model
-A_sys       = dyn_jac(xs,u);
-
-% df/da = df/dq*dq/da; Jq := dq/da
-Jq          = q.jacobian(a);
-
-% Matrix valued Chainrule
-Aa          = A_sys(1:9,10:13)*Jq;
-
-% Attitude Dynamics (from Nokland)
-f_att_nl    = [1/2*(eye(3)*eta + skew_mat(a))*(W-bg); zeros(3,1)];
-
-% Attitude Dynamics (from Markley)
-f_att_mk    = [-bg-skew_mat(W)*a; zeros(3,1)];
-
-
-Jatt        = f_att_mk.jacobian(xe);
-%Jatt(1:3,4:6) = zeros(3);
-
-%Jatt        = [zeros(6,3)
-
-A           = [A_sys(1:9,1:9) Aa zeros(9,6); Jatt; zeros(3,length(xe))];
-A_func      = Function('A_func',{xe,u,qr},{A});
-
-%% Discretization
-
-% Euler
-F           = eye(size(A)) + t_samp*A; % + 1/2*(t_samp^2*A*A); 
-
-% Jordan Normal Form; jordan() and expm() don't work with casadi
-% [V,J]       = jordan(F);
-% F           = expm(F*t_samp);
-
-F_func      = Function('F_func',{xe,u,qr},{F});
-*/
-
-void MEKF::update(const Control &u, const Measurement &z)
+MEKF::SysState MEKF::get_system_state()
 {
-    /*
-    qref            = sys_state_est(10:13);
+    SysState xs;
+    xs.block<4,1>(9,0) = qref;
+    xs.block<9,1>(0,0) = x.block<9,1>(0,0);
+    return xs;
+}
 
-    %% Nonlinear Prediction
+MEKF::Quaternion MEKF::_quat_error_mul(const MEKF::Vector3 &a,
+                                        const MEKF::Quaternion &qr)
+{
+    Quaternion dq;
+    Quaternion q;
 
-    x0              = sys_state_est;
+    // Factor
+    const Scalar f = 1;
 
-    % Numerical integration
-    % out = CVODES_INT('x0',x0, 'p',u0);
-    out             = CVODES_INT('x0',x0,'p',u);
+    // Scalar Part
+    Scalar eta = 1 - a.squaredNorm() / 8;
 
-    % x_p = [v_pred w_pred r_pred q_pred];
-    x_p             = full(out.xf);
+    // Vector Part
+    Vector3 nu = a / 2;
 
-    % Evaluate symbolic Statepropag.  at current time step
-    F               = F_func(state_est,u, qref);
+    // Error Parametrisation
+    dq << eta, nu;
+    dq *= f;
 
-    % xe_p = [v_pred w_pred r_pred a_pred bg_pred ba_pred];
-    % Propagation of the latter three is trivial, derivatives are zero.
-    % Hardcode is not nice but 'end' is spooky...
-    xe_p            = [x_p(1:9); F(10:18,:)*state_est];
-    %xe_p            = F*state_est;
+    // Erroneous Quaternion
+    q = quatmul(dq, qr);
 
+    return q;
+}
 
-    %% Covariance Prediction
+void MEKF::MEKF()
+{
+    I.setIdentity();
+}
 
-    P_last          = state_var;
+void MEKF::predict(const Control &u)
+{
+    SysState x_sys, x_sys_p
+    x_sys = get_system_state();
 
-    % For now assume discrete dynamics. If assume model to be continuous, have
-    % to use Jacobians and integrate ricatti equation here.
-    P_p             = F*P_last*F' + Q;
-    */
-
-    // prediction using numerical integration
-    SysState x_sys, x_sys_pred
-    x_sys = _to_system_state(x);
+    // numerical integration
     x_sys_p = Dynamics.integrate(x_sys, u);
 
-
-    // TODO: how to get F_func? why does it need qref?
-    F = F_func(x, u, qref);
+    F = f.jacobian(x, u, qref);
 
     State xe_p;
     xe_p.block<9,1>(0,0) = x_sys_p.block<9,1>(0,0);
     xe_p.block<9,1>(9,0) = F.block<9,18>(9,0)*x;
 
+    // Covariance prediction
+    StateCov P_p = F * P * F.transpose() + f.Q;
+}
 
-    /*
+void MEKF::correct(const Measurement &z)
+{
+    Measurement y;                      // innovation
+    Eigen::Matrix<Scalar, nz, nx> H;    // jacobian of h
+    Eigen::Matrix<Scalar, nx, nx> IKH;  // temporary matrix
 
-    %% Measurement Update
+    H = h.jacobian(xe_p, u, qref);
+    S = H * P_p * H.transpose() + h.R;
 
-    H               = H_func(state_est,u, qref,r_ant);
-    % full() because Matlab functions like size() not applicable to casadi-sparse
-    K               = P_p*H'*inv(full(H*P_p*H') + R);
-    I               = eye(length(state_est));
-    state_var       = (I - K*H)*P_last*(I-K*H)' + K*R*K';
+    // efficiently compute: K = P * H.transpose() * S.inverse();
+    K = S.llt().solve(H * P_p).transpose();
 
-    y               = h_func(xe_p,u,qref,r_ant);
-    %y               = H*xe_p;
+    y = z - h(x);
+    IKH = (I - K * H);
 
-    state_est       = xe_p + K*(z_m - y);
+    // Measurement update
+    x = xe_p + K * y;
+    P = IKH * P_p * IKH.transpose() + K * h.R * K.transpose();
 
-    %% Transforming Estimator State xe to System State xs
+    // Attitude error transfer to reference quaternion qref
+    Matrix<Scalar, 3, 1> a;
+    a = x.block<3,1>(9,0);
+    qref = _quat_error_mul(a, qref);
 
-    a               = state_est(10:12);
+    // enforce unit norm constraint
+    qref /= qref.norm();
 
-    q               = quat_error_mult(a,qref);
+    // reset MEKF error angle
+    x.block<3,1>(9,0).setZero();
+}
 
-    % Enforcing Unit norm constraint
-    q               = quatnormalize(full(q'))';
-
-    xem             = state_est;
-    Pm              = state_var;
-    sys_state_est   = [xem(1:9); q];
-    xs              = sys_state_est;
-
-    % Reset MEKF
-    state_est(10:12)= zeros(3,1);
-    */
+void MEKF::update(const Control &u, const Measurement &z)
+{
+    predict(u);
+    correct(z);
 }
 
 } // namespace bifoiler
