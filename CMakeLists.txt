@@ -18,6 +18,7 @@ link_directories(
 
 include_directories(
     ./
+    src/
     ${CASADI_INCLUDE_DIR}
     )
 
@@ -42,12 +43,14 @@ target_link_libraries(
     )
 
 add_executable(
-    hydrodynamics
-    src/hydrodynamics.cpp
+    boat_model_test
+    test/boat_model_test.cpp
+    src/boat_model.cpp
+    src/boat_properties.cpp
     )
 
 target_link_libraries(
-    hydrodynamics
+    boat_model_test
     casadi
     yaml-cpp
     )
