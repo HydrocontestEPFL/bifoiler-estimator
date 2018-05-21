@@ -295,7 +295,7 @@ void BoatDynamics::Propulsion(const BoatProperties &prop, SX &Ftbrf, SX &Mtbrf)
 
 BoatDynamics::BoatDynamics(const BoatProperties &prop)
 {
-#if 0
+#if 1
     double g = boat_pm.env.g;
     double mtot = boat_pm.inertia.mass;
 
@@ -333,26 +333,26 @@ BoatDynamics::BoatDynamics(const BoatProperties &prop)
     // TODO
 
     // Damping
-    Df = SX::diag({-10, -20, -5});
+    Df = SX::diag({-10, -20, -5}); // TODO: parametrize
     Fdbrf = Df*v;
 
     Dm = SX::diag({-2000, -800, -300});
     Mdbrf = Dm*W;
 
 
-    SX Fbrf = Fhbrf + Ftbrf + Fgbrf; // + Fbbrf
-    SX Mbrf = Mhbrf + Mtbrf; // + ...
+    SX Fbrf = Fhbrf + Ftbrf + Fdbrf + Fgbrf; // + Fbbrf
+    SX Mbrf = Mhbrf + Mtbrf + Mdbrf; // + ...
 
     // Boat translational velocity in BRF
     v_dot_brf = Fbrf/mtot - cross(W,v);
 
     // Boat roataional velocity in BRF
-    W_dot_brf = inv(Jbrf) * (Mbrf - cross(W, Jbrf * W));
+    W_dot_brf = inv(Jbrf) * (Mbrf - cross(W, Jbrf * W)); // TODO; Jbrf
 
     // Dynamic Equations: Kinematics
     qv        = quatmul(q_BI, SX::vertcat({0; v}));
     qv_q      = quatmul(qv, quatinv(q_BI));
-    r_dot_irf = qv_q(SX::Slice(1:4));
+    r_dot_irf = qv_q(Slice(1:4));
     q_BI_dot  = 0.5 * quatmul(q_BI, SX::vertcat({0,W}));
 
     // Differential equation
@@ -362,16 +362,16 @@ BoatDynamics::BoatDynamics(const BoatProperties &prop)
     jacobian = dynamics_func.jacobian(state);
     jacobian_func = Function('jacobian', {state, control}, {jacobian});
 
-    /** define RK4 integrator scheme */
+    // define RK4 integrator scheme
     SX X = SX::sym("X", 13);
     SX U = SX::sym("U", 3);
     SX dT = SX::sym("dT");
 
-    /** get symbolic expression for RK4 integrator */
+    // get symbolic expression for RK4 integrator
     SX integrator = kmath::rk4_symbolic(X, U, dynamics_func, dT);
     Function integrator_func = Function("RK4", {X,U,dT},{sym_integrator});
 
-    /* assign class attributes */
+    // assign class attributes
     this->State = state;
     this->Control = control;
 
@@ -382,6 +382,36 @@ BoatDynamics::BoatDynamics(const BoatProperties &prop)
     this->NumJacobian = jacobian_func;
     this->NumIntegrator = integrator_func;
 #endif
+
+    double t_samp = boat_pm.estimator.t_samp; // TODO
+
+    SX a = SX::sym('a',3);      // Attitude error parametrisation
+    SX bg = SX::sym('bg',3);    // IMU accelerometer bias
+    SX ba = SX::sym('ba',3);    // IMU gyroscope bias
+
+    // Attitude error transfer to reference quaternion q
+    const double f = 1;
+    SX eta = 1 - SX::dot(a,a) / 8;
+    SX nu = a / 2;
+    SX dq = f * SX::vertcat({eta, nu})
+
+    SX q = quatmul(dq, q);
+    q /= q.norm_2(); // enforce unit norm constraint
+
+    xe = SX::vertcat({v, W, r, a, bg, ba}); // estimator state
+    xs = SX::vertcat({v, W, r, q});
+
+    // (M)EKF dynamics/ Composition of total Jacobian
+
+    A = SX::vertcat({
+        SX::horzcat({A_sys(Slice(0,9), Slice(0,9)), Aa, SX::zeros(9,6)}),
+        Jatt,
+        SX::zeros(3, xe.size1())
+    });
+
+    // Discretization
+    F = SX::eye(xe.size1()) + t_samp*A; // Euler
+    F_func = Function("F_func", {xe, u, qr}, {F});
 }
 
 } // namespace bifoiler
