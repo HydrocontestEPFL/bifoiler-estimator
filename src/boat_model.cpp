@@ -28,12 +28,30 @@ SX quatinv(const SX &q)
     return inv_q;
 }
 
+// TODO: verify correctness
 SX quatrot(const SX &q, const SX &r)
 {
     SX qinv = quatinv(q);
     SX qr   = SX::vertcat({0, r});
-    SX qrr  = quatmul(quatmul(qinv, qr),q);
+    SX qrr  = quatmul(quatmul(q, qr),qinv);
     return qrr(Slice(1,4));
+}
+
+SX rk4_symbolic(const SX &x,
+                const SX &u,
+                Function &func,
+                const SX &h)
+{
+    SXVector res = func(SXVector{x, u});
+    SX k1 = res[0];
+    res = func(SXVector{x + 0.5 * h * k1, u});
+    SX k2 = res[0];
+    res = func(SXVector{x + 0.5 * h * k2, u});
+    SX k3 = res[0];
+    res = func(SXVector{x + h * k3, u});
+    SX k4 = res[0];
+
+    return x + (h/6) * (k1 + 2*k2 + 2*k3 + k4);
 }
 
 void BoatDynamics::Hydrodynamics(const SX &state, const SX &control, const BoatProperties &prop, SX &Fhbrf, SX &Mhbrf, SX &aoa, SX &ssa)
@@ -167,7 +185,6 @@ void BoatDynamics::Propulsion(const SX &state, const SX &control, const BoatProp
 
 BoatDynamics::BoatDynamics(const BoatProperties &prop)
 {
-#if 0
     double g = boat_pm.env.g;
     double mtot = boat_pm.inertia.mass;
 
@@ -222,10 +239,8 @@ BoatDynamics::BoatDynamics(const BoatProperties &prop)
     W_dot_brf = inv(Jbrf) * (Mbrf - cross(W, Jbrf * W)); // TODO; Jbrf
 
     // Dynamic Equations: Kinematics
-    qv        = quatmul(q_BI, SX::vertcat({0; v}));
-    qv_q      = quatmul(qv, quatinv(q_BI));
-    r_dot_irf = qv_q(Slice(1:4));
-    q_BI_dot  = 0.5 * quatmul(q_BI, SX::vertcat({0,W}));
+    SX r_dot_irf = quatrot(q_BI, v);
+    q_BI_dot  = 0.5 * quatmul(q_BI, SX::vertcat({0,W})); // TODO: verify correctness
 
     // Differential equation
     SX dynamics = SX::vertcat({v_dot_brf, W_dot_brf, r_dot_irf, q_BI_dot});
@@ -240,7 +255,7 @@ BoatDynamics::BoatDynamics(const BoatProperties &prop)
     SX dT = SX::sym("dT");
 
     // get symbolic expression for RK4 integrator
-    SX integrator = kmath::rk4_symbolic(X, U, dynamics_func, dT);
+    SX integrator = rk4_symbolic(X, U, dynamics_func, dT);
     Function integrator_func = Function("RK4", {X,U,dT},{sym_integrator});
 
     // assign class attributes
@@ -253,6 +268,8 @@ BoatDynamics::BoatDynamics(const BoatProperties &prop)
     this->NumDynamics = dynamics_func;
     this->NumJacobian = jacobian_func;
     this->NumIntegrator = integrator_func;
+
+#if 0
 
     double t_samp = boat_pm.estimator.t_samp; // TODO
 

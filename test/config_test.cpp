@@ -14,4 +14,7 @@ int main(int argc, char *argv[])
 
     std::cout << "name " << config["name"].as<std::string>() << std::endl;
     std::cout << "mass " << config["inertia"]["mass"].as<double>() << std::endl;
+
+    auto inertia = config["inertia"];
+    std::cout << "inertia " << inertia << std::endl;
 }
