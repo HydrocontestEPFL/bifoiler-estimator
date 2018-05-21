@@ -28,8 +28,7 @@ private:
     Eigen::Matrix<Scalar, nx, nz> K; // Kalman gain
     Eigen::Matrix<Scalar, nx, nx> I; // identity
 
-    Quaternion _quat_error_mult(const Vector3 &a,
-                                const Quaternion &qr);
+    Quaternion _qerr(const Vector3 &a);
 
 public:
     SysState get_system_state();
@@ -64,8 +63,7 @@ MEKF::Quaternion MEKF::quatmul(const MEKF::Quaternion &q1, const MEKF::Quaternio
     return q;
 }
 
-MEKF::Quaternion MEKF::_quat_error_mul(const MEKF::Vector3 &a,
-                                        const MEKF::Quaternion &qr)
+MEKF::Quaternion MEKF::_qerr(const MEKF::Vector3 &a)
 {
     Quaternion dq;
 
@@ -82,8 +80,7 @@ MEKF::Quaternion MEKF::_quat_error_mul(const MEKF::Vector3 &a,
     dq << eta, nu;
     dq *= f;
 
-    // Erroneous Quaternion
-    return quatmul(dq, qr);
+    return dq;
 }
 
 void MEKF::MEKF()
@@ -114,7 +111,8 @@ void MEKF::correct(const Measurement &z)
     Measurement y;                      // innovation
     Eigen::Matrix<Scalar, nz, nx> H;    // jacobian of h
     Eigen::Matrix<Scalar, nx, nx> IKH;  // temporary matrix
-    Vector3 a;                          // attitude error
+    Vector3 a;                          // attitude error parametrisation
+    Quaternion dq;                      // attitude error quaternion
 
     H = h.jacobian(x, u, qref);
     S = H * P * H.transpose() + h.R;
@@ -130,8 +128,9 @@ void MEKF::correct(const Measurement &z)
     P = IKH * P * IKH.transpose() + K * h.R * K.transpose();
 
     // Attitude error transfer to reference quaternion qref
-    a = x.block<3,1>(9,0);
-    qref = _quat_error_mul(a, qref);
+    a << x.block<3,1>(9,0);
+    dq = _qerr(a);
+    qref = quatmul(dq, qref);
 
     // enforce unit norm constraint
     qref /= qref.norm();
