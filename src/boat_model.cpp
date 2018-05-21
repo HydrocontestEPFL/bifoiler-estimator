@@ -2,141 +2,13 @@
 #include <math.h>
 
 #include <casadi/casadi.hpp>
-#include <yaml-cpp/yaml.h>
+
+#include "boat_model.h"
+#include "boat_properties.h"
 
 using namespace casadi;
 
 namespace bifoiler {
-
-struct BoatProperties
-{
-    std::string name;
-
-    struct {
-        double rho_sh2o;
-    } env;
-
-    struct {
-        double mass;
-        double mas_cad;
-        double Ibxx_xflr5;
-        double Ibyy_xflr5;
-        double Ibzz_xflr5;
-        double Ibxz_xflr5;
-        double Ixy;
-        double Ixz;
-        double Iyz;
-        double Ixx;
-        double Iyy;
-        double Izz;
-    } inertia;
-
-    struct {
-        double ARff;
-        double areaff;
-        double mac;
-        double wingspanff;
-    } foils;
-
-    struct {
-        double CL0;
-        double CLa_total;
-        double e_oswald;
-        double CD0_total;
-        double CYb;
-        double Cm0;
-        double Cma;
-        double Cn0;
-        double Cnb;
-        double Cl0;
-        double Clb;
-        double CLq;
-        double Cmq;
-        double CYr;
-        double Cnr;
-        double Clr;
-        double CYp;
-        double Clp;
-        double Cnp;
-        double CXdf;
-        double CYdr;
-        double CZde;
-        double CZdf;
-        double CLda;
-        double CLdr;
-        double CMde;
-        double CMdf;
-        double CNda;
-        double CNdr;
-    } hydrodynamic;
-};
-
-class BoatDynamics
-{
-public:
-    casadi::SX State;
-    casadi::SX Control;
-    casadi::SX SymDynamics;
-    casadi::SX SymIntegartor;
-    casadi::SX SymJacobian;
-
-    casadi::Function NumDynamics;
-    casadi::Function NumIntegrator;
-    casadi::Function NumJacobian;
-
-    BoatDynamics(const BoatProperties &boat_prop);
-    static void Hydrodynamics(SX &state, SX &control, const BoatProperties &prop, SX &Fhbrf, SX &Mhbrf, SX &aoa, SX &ssa);
-    static void Propulsion(const BoatProperties &prop, SX &Ftbrf, SX &Mtbrf)
-    static BoatProperties LoadProperties(const std::string &filename);
-};
-
-BoatProperties BoatDynamics::LoadProperties(const std::string &filename)
-{
-    YAML::Node config = YAML::LoadFile(filename);
-
-    BoatProperties prop;
-    prop.name = config["name"].as<std::string>();
-    prop.env.rho_sh2o = config["env"]["rho_sh2o"].as<double>();
-
-    auto foils = config["foils"];
-    prop.foils.ARff = foils["ARff"].as<double>();
-    prop.foils.areaff = foils["areaff"].as<double>();
-    prop.foils.mac = foils["mac"].as<double>();
-    prop.foils.wingspanff = foils["wingspanff"].as<double>();
-
-    auto hydro = config["hydrodynamic"];
-    prop.hydrodynamic.CL0 = hydro["CL0"].as<double>();
-    prop.hydrodynamic.CLa_total = hydro["CLa_total"].as<double>();
-    prop.hydrodynamic.e_oswald = hydro["e_oswald"].as<double>();
-    prop.hydrodynamic.CD0_total = hydro["CD0_total"].as<double>();
-    prop.hydrodynamic.CYb = hydro["CYb"].as<double>();
-    prop.hydrodynamic.Cm0 = hydro["Cm0"].as<double>();
-    prop.hydrodynamic.Cma = hydro["Cma"].as<double>();
-    prop.hydrodynamic.Cn0 = hydro["Cn0"].as<double>();
-    prop.hydrodynamic.Cnb = hydro["Cnb"].as<double>();
-    prop.hydrodynamic.Cl0 = hydro["Cl0"].as<double>();
-    prop.hydrodynamic.Clb = hydro["Clb"].as<double>();
-    prop.hydrodynamic.CLq = hydro["CLq"].as<double>();
-    prop.hydrodynamic.Cmq = hydro["Cmq"].as<double>();
-    prop.hydrodynamic.CYr = hydro["CYr"].as<double>();
-    prop.hydrodynamic.Cnr = hydro["Cnr"].as<double>();
-    prop.hydrodynamic.Clr = hydro["Clr"].as<double>();
-    prop.hydrodynamic.CYp = hydro["CYp"].as<double>();
-    prop.hydrodynamic.Clp = hydro["Clp"].as<double>();
-    prop.hydrodynamic.Cnp = hydro["Cnp"].as<double>();
-    prop.hydrodynamic.CXdf = hydro["CXdf"].as<double>();
-    prop.hydrodynamic.CYdr = hydro["CYdr"].as<double>();
-    prop.hydrodynamic.CZde = hydro["CZde"].as<double>();
-    prop.hydrodynamic.CZdf = hydro["CZdf"].as<double>();
-    prop.hydrodynamic.CLda = hydro["CLda"].as<double>();
-    prop.hydrodynamic.CLdr = hydro["CLdr"].as<double>();
-    prop.hydrodynamic.CMde = hydro["CMde"].as<double>();
-    prop.hydrodynamic.CMdf = hydro["CMdf"].as<double>();
-    prop.hydrodynamic.CNda = hydro["CNda"].as<double>();
-    prop.hydrodynamic.CNdr = hydro["CNdr"].as<double>();
-
-    return prop;
-}
 
 SX quatmul(const SX &q1, const SX &q2)
 {
@@ -164,7 +36,7 @@ SX quatrot(const SX &q, const SX &r)
     return qrr(Slice(1,4));
 }
 
-void BoatDynamics::Hydrodynamics(SX &state, SX &control, const BoatProperties &prop, SX &Fhbrf, SX &Mhbrf, SX &aoa, SX &ssa)
+void BoatDynamics::Hydrodynamics(const SX &state, const SX &control, const BoatProperties &prop, SX &Fhbrf, SX &Mhbrf, SX &aoa, SX &ssa)
 {
     double rho = prop.env.rho_sh2o;
     double AR  = prop.foils.ARff;        // [-], Aspect Ratio (Flügelstreckung)
@@ -270,7 +142,7 @@ void BoatDynamics::Hydrodynamics(SX &state, SX &control, const BoatProperties &p
     Mhbrf = quatrot(q_BV, Mhvrf);
 }
 
-void BoatDynamics::Propulsion(const BoatProperties &prop, SX &Ftbrf, SX &Mtbrf)
+void BoatDynamics::Propulsion(const SX &state, const SX &control, const BoatProperties &prop, SX &Ftbrf, SX &Mtbrf)
 {
     // TODO: move constants into BoatProperties
 
@@ -295,7 +167,7 @@ void BoatDynamics::Propulsion(const BoatProperties &prop, SX &Ftbrf, SX &Mtbrf)
 
 BoatDynamics::BoatDynamics(const BoatProperties &prop)
 {
-#if 1
+#if 0
     double g = boat_pm.env.g;
     double mtot = boat_pm.inertia.mass;
 
@@ -381,7 +253,6 @@ BoatDynamics::BoatDynamics(const BoatProperties &prop)
     this->NumDynamics = dynamics_func;
     this->NumJacobian = jacobian_func;
     this->NumIntegrator = integrator_func;
-#endif
 
     double t_samp = boat_pm.estimator.t_samp; // TODO
 
@@ -412,37 +283,7 @@ BoatDynamics::BoatDynamics(const BoatProperties &prop)
     // Discretization
     F = SX::eye(xe.size1()) + t_samp*A; // Euler
     F_func = Function("F_func", {xe, u, qr}, {F});
+#endif
 }
 
 } // namespace bifoiler
-
-using namespace bifoiler;
-
-int main(int argc, char *argv[])
-{
-    if (argc < 2) {
-        std::cout << "usage: " << argv[0] << " path/to/config.yaml" << std::endl;
-        return -1;
-    }
-
-    std::string config_file(argv[1]);
-    auto prop = BoatDynamics::LoadProperties(config_file);
-
-    SX v    = SX::sym("v", 3);   // [m/s] translational velocity of the CoG in BRF
-    SX W    = SX::sym("W", 3);   // [rad/s] angular velocities of boat in BRF
-    SX r    = SX::sym("r", 3);   // [m] position of the CoG in IRF
-    SX q_BI = SX::sym("q", 4);   // unit quaternion for transformation from IRF to BRF
-    SX state    = SX::vertcat({v, W, r, q_BI});
-
-    SX dF   = SX::sym("dF");     // Flaps
-    SX dA   = SX::sym("dA");     // Aileron deflection [reserved, but not used] [rad]
-    SX dR   = SX::sym("dR");     // Rudder deflection [rad]
-    SX dE   = SX::sym("dE");     // Elevator deflection [positive down] [rad]
-    SX control  = SX::vertcat({dF, dA, dR, dE});
-
-    SX Fhbrf, Mhbrf, aoa, ssa;
-
-    BoatDynamics::Hydrodynamics(state, control, prop, Fhbrf, Mhbrf, aoa, ssa);
-
-    std::cout << Fhbrf << "\n" << Mhbrf << "\n" << aoa << "\n" << ssa << "\n";
-}
