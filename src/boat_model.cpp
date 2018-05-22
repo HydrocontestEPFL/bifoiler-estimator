@@ -33,6 +33,14 @@ SX quatrot(const SX &q, const SX &r)
 {
     SX qinv = quatinv(q);
     SX qr   = SX::vertcat({0, r});
+    SX qrr  = quatmul(quatmul(qinv, qr),q);
+    return qrr(Slice(1,4));
+}
+
+SX quatrot_inverse(const SX &q, const SX &r)
+{
+    SX qinv = quatinv(q);
+    SX qr   = SX::vertcat({0, r});
     SX qrr  = quatmul(quatmul(q, qr),qinv);
     return qrr(Slice(1,4));
 }
@@ -239,7 +247,7 @@ BoatDynamics::BoatDynamics(const BoatProperties &prop)
     W_dot_brf = inv(Jbrf) * (Mbrf - cross(W, Jbrf * W)); // TODO; Jbrf
 
     // Dynamic Equations: Kinematics
-    SX r_dot_irf = quatrot(q_BI, v);
+    SX r_dot_irf = quatrot_inverse(q_BI, v);
     q_BI_dot  = 0.5 * quatmul(q_BI, SX::vertcat({0,W})); // TODO: verify correctness
 
     // Differential equation
