@@ -28,6 +28,7 @@ SX quatinv(const SX &q)
     return inv_q;
 }
 
+// TODO: optimization: we have unit norm quaternions -> use conjugate instead of inverse.
 // TODO: verify correctness
 SX quatrot(const SX &q, const SX &r)
 {
@@ -171,6 +172,7 @@ void BoatDynamics::Hydrodynamics(const SX &state, const SX &control, const BoatP
 void BoatDynamics::Propulsion(const SX &state, const SX &control, const BoatProperties &prop, SX &Ftbrf, SX &Mtbrf)
 {
     // TODO: move constants into BoatProperties
+    // TODO: use control input thrust
 
     // propmode: "endurance"
     // double Ftbrfx = 71;   // [N] in the Steady State
@@ -193,69 +195,81 @@ void BoatDynamics::Propulsion(const SX &state, const SX &control, const BoatProp
 
 BoatDynamics::BoatDynamics(const BoatProperties &prop)
 {
-    double g = boat_pm.env.g;
-    double mtot = boat_pm.inertia.mass;
+    double g = prop.env.g;
+    double mass = prop.inertia.mass;
+    double mass_cad = prop.inertia.mass_cad;
+    double mcorr = mass / mass_cad; // Until better values: make boat uniformly heavier/inert
 
-    // TODO
-    // Jbrf = [boat_pm.Ixx boat_pm.Ixy boat_pm.Ixz; boat_pm.Ixy boat_pm.Iyy boat_pm.Iyz; boat_pm.Ixz boat_pm.Iyz boat_pm.Izz]; %[kg m^2], inertial tensor
-    // Jbrf = Jbrf./boat_pm.mtot_cad*mtot;              % Until better values: make boat uniformly heavier/inert
+    double Ixy = mcorr * prop.inertia.Ixy;
+    double Ixz = mcorr * prop.inertia.Ixz;
+    double Iyz = mcorr * prop.inertia.Iyz;
+
+    double Ixx = mcorr * prop.inertia.Ixx;
+    double Iyy = mcorr * prop.inertia.Iyy;
+    double Izz = mcorr * prop.inertia.Izz;
+
+    SX Jbrf = SX::vertcat({  // [kg m^2], inertial tensor
+        SX::horzcat({Ixx, Ixy, Ixz}),
+        SX::horzcat({Ixy, Iyy, Iyz}),
+        SX::horzcat({Ixz, Iyz, Izz})
+    });
 
     // State and Control variables
-    SX v    = SX.sym("v", 3);   // [m/s] translational velocity of the CoG in BRF
-    SX W    = SX.sym("W", 3);   // [rad/s] angular velocities of boat in BRF
-    SX r    = SX.sym("r", 3);   // [m] position of the CoG in IRF
-    SX q_BI = SX.sym("q", 4);   // unit quaternion for transformation from IRF to BRF
+    SX v    = SX::sym("v", 3);   // [m/s] translational velocity of the CoG in BRF
+    SX W    = SX::sym("W", 3);   // [rad/s] angular velocities of boat in BRF
+    SX r    = SX::sym("r", 3);   // [m] position of the CoG in IRF
+    SX q_BI = SX::sym("q", 4);   // unit quaternion for transformation from IRF to BRF
 
-    SX dF   = SX.sym("dF");     // Flaps
-    SX dA   = SX.sym("dA");     // Aileron deflection [reserved, but not used] [rad]
-    SX dR   = SX.sym("dR");     // Rudder deflection [rad]
-    SX dE   = SX.sym("dE");     // Elevator deflection [positive down] [rad]
+    SX dF   = SX::sym("dF");     // Flaps
+    SX dA   = SX::sym("dA");     // Aileron deflection [reserved, but not used] [rad]
+    SX dR   = SX::sym("dR");     // Rudder deflection [rad]
+    SX dE   = SX::sym("dE");     // Elevator deflection [positive down] [rad]
 
     SX state    = SX::vertcat({v, W, r, q_BI});
     SX control  = SX::vertcat({dF, dA, dR, dE});
 
     // Gravity
-    SX Fgbrf = quatrot(q_BI, SX::vertcat({0,0,g}))
+    SX Fgbrf = quatrot(q_BI, SX::vertcat({0,0,g}));
 
     // Propulsion
     SX Ftbrf, Mtbrf;
-    Propulsion(prop, Ftbrf, Mtbrf);
+    Propulsion(state, control, prop, Ftbrf, Mtbrf);
 
     // Hydrodynamics
-    SX Fhbrf, Mhbrf;
-    Hydrodynamics(prop, state, control, Fhbrf, Mhbrf);
+    SX Fhbrf, Mhbrf, aoa, ssa; // TODO: aoa, ssa unused?
+    Hydrodynamics(state, control, prop, Fhbrf, Mhbrf, aoa, ssa);
 
     // Buoyancy
     // SX Fbbrf, Mbbrf;
     // TODO
 
     // Damping
-    Df = SX::diag({-10, -20, -5}); // TODO: parametrize
-    Fdbrf = Df*v;
+    SX Df = SX::diag(SX::vertcat({-10, -20, -5})); // TODO: parametrize
+    SX Fdbrf = Df*v;
 
-    Dm = SX::diag({-2000, -800, -300});
-    Mdbrf = Dm*W;
+    SX Dm = SX::diag(SX::vertcat({-2000, -800, -300}));
+    SX Mdbrf = Dm*W;
 
 
     SX Fbrf = Fhbrf + Ftbrf + Fdbrf + Fgbrf; // + Fbbrf
     SX Mbrf = Mhbrf + Mtbrf + Mdbrf; // + ...
 
     // Boat translational velocity in BRF
-    v_dot_brf = Fbrf/mtot - cross(W,v);
+    SX v_dot_brf = Fbrf / mass - SX::cross(W,v);
 
     // Boat roataional velocity in BRF
-    W_dot_brf = inv(Jbrf) * (Mbrf - cross(W, Jbrf * W)); // TODO; Jbrf
+    SX W_dot_brf = SX::mtimes(SX::inv(Jbrf), (Mbrf - SX::cross(W, SX::mtimes(Jbrf, W))));
 
     // Dynamic Equations: Kinematics
     SX r_dot_irf = quatrot_inverse(q_BI, v);
-    q_BI_dot  = 0.5 * quatmul(q_BI, SX::vertcat({0,W})); // TODO: verify correctness
+    SX q_BI_dot  = 0.5 * quatmul(q_BI, SX::vertcat({0,W})); // TODO: verify correctness
 
     // Differential equation
     SX dynamics = SX::vertcat({v_dot_brf, W_dot_brf, r_dot_irf, q_BI_dot});
 
-    dynamics_func = Function("dynamics", {state,control}, {dynamics});
-    jacobian = dynamics_func.jacobian(state);
-    jacobian_func = Function('jacobian', {state, control}, {jacobian});
+    Function dynamics_func = Function("dynamics", {state, control}, {dynamics});
+    SX jacobian = SX::jacobian(dynamics, state);
+    Function jacobian_func = Function("jacobian", {state, control}, {jacobian});
 
     // define RK4 integrator scheme
     SX X = SX::sym("X", 13);
@@ -264,7 +278,7 @@ BoatDynamics::BoatDynamics(const BoatProperties &prop)
 
     // get symbolic expression for RK4 integrator
     SX integrator = rk4_symbolic(X, U, dynamics_func, dT);
-    Function integrator_func = Function("RK4", {X,U,dT},{sym_integrator});
+    Function integrator_func = Function("RK4", {X,U,dT},{integrator});
 
     // assign class attributes
     this->State = state;

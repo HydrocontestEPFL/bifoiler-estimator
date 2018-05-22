@@ -8,7 +8,20 @@ BoatProperties BoatProperties::Load(const std::string &filename)
 
     BoatProperties prop;
     prop.name = config["name"].as<std::string>();
-    prop.env.rho_sh2o = config["env"]["rho_sh2o"].as<double>();
+
+    auto env = config["env"];
+    prop.env.rho_sh2o = env["rho_sh2o"].as<double>();
+    prop.env.g = env["rho_sh2o"].as<double>();
+
+    auto inertia = config["inertia"];
+    prop.inertia.mass = inertia["mass"].as<double>();
+    prop.inertia.mass_cad = inertia["mass_cad"].as<double>();
+    prop.inertia.Ixy = inertia["Ixy"].as<double>();
+    prop.inertia.Ixz = inertia["Ixz"].as<double>();
+    prop.inertia.Iyz = inertia["Iyz"].as<double>();
+    prop.inertia.Ixx = inertia["Ixx"].as<double>();
+    prop.inertia.Iyy = inertia["Iyy"].as<double>();
+    prop.inertia.Izz = inertia["Izz"].as<double>();
 
     auto foils = config["foils"];
     prop.foils.ARff = foils["ARff"].as<double>();

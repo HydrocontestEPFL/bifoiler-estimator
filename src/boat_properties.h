@@ -7,15 +7,12 @@ struct BoatProperties
 
     struct {
         double rho_sh2o;
+        double g;
     } env;
 
     struct {
         double mass;
-        double mas_cad;
-        double Ibxx_xflr5;
-        double Ibyy_xflr5;
-        double Ibzz_xflr5;
-        double Ibxz_xflr5;
+        double mass_cad;
         double Ixy;
         double Ixz;
         double Iyz;
