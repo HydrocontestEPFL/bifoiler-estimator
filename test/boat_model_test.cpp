@@ -27,15 +27,28 @@ int main(int argc, char *argv[])
     SX dE   = SX::sym("dE");     // Elevator deflection [positive down] [rad]
     SX control  = SX::vertcat({dF, dA, dR, dE});
 
-    SX Fhbrf, Mhbrf, aoa, ssa;
+    // SX Fhbrf, Mhbrf, aoa, ssa;
 
-    BoatDynamics::Hydrodynamics(state, control, prop, Fhbrf, Mhbrf, aoa, ssa);
+    // BoatDynamics::Hydrodynamics(state, control, prop, Fhbrf, Mhbrf, aoa, ssa);
 
-    std::cout << Fhbrf << "\n" << Mhbrf << "\n" << aoa << "\n" << ssa << "\n";
+    // std::cout << Fhbrf << "\n" << Mhbrf << "\n" << aoa << "\n" << ssa << "\n";
 
     BoatDynamics boat(prop);
 
     std::cout << "SymbolicIntegrator =\n" << boat.getSymbolicIntegrator() << "\n";
     std::cout << "SymbolicDynamics =\n" << boat.getSymbolicDynamics() << "\n";
     std::cout << "SymbolicJacobian =\n" << boat.getSymbolicJacobian() << "\n";
+
+    DM x0 = DM::vertcat({5, 0, 0, // v
+                         0, 0, 0, // W
+                         0, 0, 0, // r
+                         1, 0, 0, 0 // q
+    });
+    DM u0 = DM::vertcat({0, 0, 0, 0});
+
+    Function dynamics = boat.getNumericDynamics();
+    std::cout << dynamics(SXVector{x0, u0}) << "\n";
+
+    // boat.getNumericDynamics().generate();
+    // boat.getNumericIntegrator().generate();
 }
