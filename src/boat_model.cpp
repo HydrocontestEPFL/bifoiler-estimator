@@ -22,6 +22,7 @@ SX quatmul(const SX &q1, const SX &q2)
     return q;
 }
 
+// TODO: should be divided by squared norm
 SX quatinv(const SX &q)
 {
     SX inv_q = SX::vertcat({q(0), -q(1), -q(2), -q(3)}) / SX::norm_2(q);
@@ -229,7 +230,7 @@ BoatDynamics::BoatDynamics(const BoatProperties &prop)
     SX control  = SX::vertcat({dF, dA, dR, dE});
 
     // Gravity
-    SX Fgbrf = quatrot(q_BI, SX::vertcat({0,0,g}));
+    SX Fgbrf = mass*quatrot(q_BI, SX::vertcat({0,0,g}));
 
     // Propulsion
     SX Ftbrf, Mtbrf;

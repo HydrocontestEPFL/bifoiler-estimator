@@ -11,7 +11,7 @@ BoatProperties BoatProperties::Load(const std::string &filename)
 
     auto env = config["env"];
     prop.env.rho_sh2o = env["rho_sh2o"].as<double>();
-    prop.env.g = env["rho_sh2o"].as<double>();
+    prop.env.g = env["g"].as<double>();
 
     auto inertia = config["inertia"];
     prop.inertia.mass = inertia["mass"].as<double>();
