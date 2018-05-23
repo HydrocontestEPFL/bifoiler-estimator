@@ -32,4 +32,10 @@ int main(int argc, char *argv[])
     BoatDynamics::Hydrodynamics(state, control, prop, Fhbrf, Mhbrf, aoa, ssa);
 
     std::cout << Fhbrf << "\n" << Mhbrf << "\n" << aoa << "\n" << ssa << "\n";
+
+    BoatDynamics boat(prop);
+
+    std::cout << "SymbolicIntegrator =\n" << boat.getSymbolicIntegrator() << "\n";
+    std::cout << "SymbolicDynamics =\n" << boat.getSymbolicDynamics() << "\n";
+    std::cout << "SymbolicJacobian =\n" << boat.getSymbolicJacobian() << "\n";
 }

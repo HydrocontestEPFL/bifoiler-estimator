@@ -245,10 +245,10 @@ BoatDynamics::BoatDynamics(const BoatProperties &prop)
 
     // Damping
     SX Df = SX::diag(SX::vertcat({-10, -20, -5})); // TODO: parametrize
-    SX Fdbrf = Df*v;
+    SX Fdbrf = SX::mtimes(Df, v);
 
     SX Dm = SX::diag(SX::vertcat({-2000, -800, -300}));
-    SX Mdbrf = Dm*W;
+    SX Mdbrf = SX::mtimes(Dm, W);
 
 
     SX Fbrf = Fhbrf + Ftbrf + Fdbrf + Fgbrf; // + Fbbrf
@@ -272,8 +272,8 @@ BoatDynamics::BoatDynamics(const BoatProperties &prop)
     Function jacobian_func = Function("jacobian", {state, control}, {jacobian});
 
     // define RK4 integrator scheme
-    SX X = SX::sym("X", 13);
-    SX U = SX::sym("U", 3);
+    SX X = SX::sym("X", state.size1());
+    SX U = SX::sym("U", control.size1());
     SX dT = SX::sym("dT");
 
     // get symbolic expression for RK4 integrator
@@ -286,6 +286,7 @@ BoatDynamics::BoatDynamics(const BoatProperties &prop)
 
     this->SymDynamics = dynamics;
     this->SymIntegartor = integrator;
+    this->SymJacobian = jacobian;
 
     this->NumDynamics = dynamics_func;
     this->NumJacobian = jacobian_func;

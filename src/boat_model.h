@@ -10,6 +10,18 @@ class BoatDynamics
 {
 public:
     BoatDynamics(const BoatProperties &boat_prop);
+
+    casadi::SX getSymbolicState(){return this->State;}
+    casadi::SX getSymbolicControl(){return this->Control;}
+
+    casadi::SX getSymbolicDynamics(){return this->SymDynamics;}
+    casadi::SX getSymbolicIntegrator(){return this->SymIntegartor;}
+    casadi::SX getSymbolicJacobian(){return this->SymJacobian;}
+
+    casadi::Function getNumericDynamics(){return this->NumDynamics;}
+    casadi::Function getNumericIntegrator(){return this->NumIntegrator;}
+    casadi::Function getNumericJacobian(){return this->NumJacobian;}
+
     static void Hydrodynamics(const casadi::SX &state,
                               const casadi::SX &control,
                               const BoatProperties &prop,
@@ -22,7 +34,6 @@ public:
                            const BoatProperties &prop,
                            casadi::SX &Ftbrf,
                            casadi::SX &Mtbrf);
-
 private:
     casadi::SX State;
     casadi::SX Control;
