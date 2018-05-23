@@ -253,7 +253,7 @@ BoatDynamics::BoatDynamics(const BoatProperties &prop)
 
 
     SX Fbrf = Fhbrf + Ftbrf + Fdbrf + Fgbrf; // + Fbbrf
-    SX Mbrf = Mhbrf + Mtbrf + Mdbrf; // + ...
+    SX Mbrf = Mhbrf + Mdbrf; // + Mtbrf + Mbbrf; // TODO: why no thrust moment?
 
     // Boat translational velocity in BRF
     SX v_dot_brf = Fbrf / mass - SX::cross(W,v);

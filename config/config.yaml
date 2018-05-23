@@ -47,10 +47,10 @@ hydrodynamic:
   CLa_total:            7.8846
   e_oswald:             0.985
   CD0_total:            0.016      # before: 9.226
-  CYb:                  0.73389    # -3.3039
+  CYb:                  -0.73389    # -3.3039
 
   Cm0:                  0.0738
-  Cma:                  30.968     # !!!
+  Cma:                  -30.968     # !!!
 
   Cn0:                  0
   Cnb:                  0.97898    # 4.4534
@@ -59,23 +59,23 @@ hydrodynamic:
   Clb:                  0.37912    # 1.0731
 
   CLq:                  103.32
-  Cmq:                  2216       # -2212.8
+  Cmq:                  -2216       # -2212.8
 
   CYr:                  2.0261     #  9.2322
-  Cnr:                  2.7004     # -12.45
-  Clr:                  1.0025     # -2.943
+  Cnr:                  -2.7004     # -12.45
+  Clr:                  -1.0025     # -2.943
 
   CYp:                  0.828      #  2.3851
-  Clp:                  1.172      # -1.638
-  Cnp:                  1.13       # -3.2298
+  Clp:                  -1.172      # -1.638
+  Cnp:                  -1.13       # -3.2298
 
-  CXdf:                 0.09823
-  CYdr:                 0.1121
-  CZde:                 0 # -3.25  # Lift,: CZ in log
-  CZdf:                 3.27
+  CXdf:                 -0.09823
+  CYdr:                 -0.1121
+  CZde:                 -0 # -3.25  # Lift,: CZ in log
+  CZdf:                 -3.27
   CLda:                 0.1412     # Roll,: CL in log, aileron
   CLdr:                 0.1235     # Wild Guess, maybe can dig it out from fin log file...
   CMde:                 0 # -55.889;
   CMdf:                 17.492
   CNda:                 0.1193
-  CNdr:                 12.396     # Cnr, have no control derivatives
+  CNdr:                 -12.396     # Cnr, have no control derivatives
