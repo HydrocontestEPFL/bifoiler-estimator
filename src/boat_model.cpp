@@ -115,7 +115,7 @@ void BoatDynamics::Hydrodynamics(const SX &state, const SX &control, const BoatP
     SX dF = control(0); // Flaps
     SX dA = control(1); // Aileron
     SX dR = control(2); // Rudder
-    SX dE = control(3); // Elevator
+    // SX dE = control(3); // Elevator
 
     // Variables and Orientation
     const double v1_eps   = 0.0001;    // Enable v(1)_0 = 0 w/o getting NaN
@@ -224,10 +224,10 @@ BoatDynamics::BoatDynamics(const BoatProperties &prop)
     SX dF   = SX::sym("dF");     // Flaps
     SX dA   = SX::sym("dA");     // Aileron deflection [reserved, but not used] [rad]
     SX dR   = SX::sym("dR");     // Rudder deflection [rad]
-    SX dE   = SX::sym("dE");     // Elevator deflection [positive down] [rad]
+    // SX dE   = SX::sym("dE");     // Elevator deflection [positive down] [rad]
 
     SX state    = SX::vertcat({v, W, r, q_BI});
-    SX control  = SX::vertcat({dF, dA, dR, dE});
+    SX control  = SX::vertcat({dF, dA, dR}); // TODO: why is elevator deflection dE not used?
 
     // Gravity
     SX Fgbrf = mass*quatrot(q_BI, SX::vertcat({0,0,g}));

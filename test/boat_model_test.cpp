@@ -41,13 +41,18 @@ int main(int argc, char *argv[])
 
     DM x0 = DM::vertcat({5, 0, 0, // v
                          0, 0, 0, // W
-                         0, 0, 0, // r
+                         0, 0, -0.2231, // r
                          1, 0, 0, 0 // q
     });
-    DM u0 = DM::vertcat({0, 0, 0, 0});
+    DM u0 = DM::vertcat({0, 0, 0});
+
+    std::cout << x0 << "\n";
+    std::cout << u0 << "\n";
 
     Function dynamics = boat.getNumericDynamics();
+    Function jacobian = boat.getNumericJacobian();
     std::cout << dynamics(SXVector{x0, u0}) << "\n";
+    std::cout << jacobian(SXVector{x0, u0}) << "\n";
 
     // boat.getNumericDynamics().generate();
     // boat.getNumericIntegrator().generate();
