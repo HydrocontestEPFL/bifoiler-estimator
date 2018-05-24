@@ -64,6 +64,23 @@ SX rk4_symbolic(const SX &x,
     return x + (h/6) * (k1 + 2*k2 + 2*k3 + k4);
 }
 
+// TODO: debug only, remove later
+DM x0, u0;
+static void print_expr(const char *name, SX &sym, SX &x, SX &u)
+{
+    std::cout << name << "\n";
+    std::cout << sym << "\n";
+    Function f = Function(name,{x, u},{sym});
+    std::cout << f(SXVector{x0, u0}) << "\n";
+}
+
+// TODO: debug only, remove later
+static void print_jacobian(const char *name, SX &sym, SX &x, SX &u)
+{
+    SX jac = SX::jacobian(sym, x);
+    print_expr(name, jac, x, u);
+}
+
 void BoatDynamics::Hydrodynamics(const SX &state, const SX &control, const BoatProperties &prop, SX &Fhbrf, SX &Mhbrf, SX &aoa, SX &ssa)
 {
     double rho = prop.env.rho_sh2o;
