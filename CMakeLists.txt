@@ -12,6 +12,10 @@ SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
 find_package(casadi REQUIRED)
 find_package(yaml-cpp 0.6 REQUIRED)
 
+# Eigen library
+find_package(Eigen3 3.3 REQUIRED NO_MODULE)
+
+
 link_directories(
     $ENV{CASADI_PREFIX}
     )
@@ -53,4 +57,15 @@ target_link_libraries(
     boat_model_test
     casadi
     yaml-cpp
+    )
+
+add_executable(
+    codegen_test
+    test/codegen_test.cpp
+    test/codegen_dynamics.c
+    )
+
+target_link_libraries(
+    codegen_test
+    Eigen3::Eigen
     )

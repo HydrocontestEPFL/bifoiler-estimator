@@ -33,4 +33,9 @@ int main(int argc, char *argv[])
 
     Function jacobian = boat.getNumericJacobian();
     std::cout << jacobian(SXVector{x0, u0}) << "\n";
+
+    Dict opt = {
+        {"with_header", true},
+    };
+    dynamics.generate("codegen_dynamics", opt);
 }
