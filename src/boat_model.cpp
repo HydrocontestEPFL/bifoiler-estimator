@@ -22,18 +22,25 @@ SX quatmul(const SX &q1, const SX &q2)
     return q;
 }
 
-// TODO: should be divided by squared norm
-SX quatinv(const SX &q)
+SX quatconj(const SX &q)
 {
-    SX inv_q = SX::vertcat({q(0), -q(1), -q(2), -q(3)}) / SX::norm_2(q);
-    return inv_q;
+    return SX::vertcat({q(0), -q(1), -q(2), -q(3)});
 }
 
-// TODO: optimization: we have unit norm quaternions -> use conjugate instead of inverse.
-// TODO: verify correctness
+SX quatinv(const SX &q)
+{
+    // TODO: should be divided by squared norm
+    return quatconj(q) / SX::norm_2(q);
+
+    // SX norm_squared = SX::dot(q,q);
+    // return quatconj(q) / norm_squared;
+}
+
+// TODO: verify correctness (multiplication order)
 SX quatrot(const SX &q, const SX &r)
 {
-    SX qinv = quatinv(q);
+    // SX qinv = quatinv(q);
+    SX qinv = quatconj(q);  // q_inv = q_conj for unit quaternions
     SX qr   = SX::vertcat({0, r});
     SX qrr  = quatmul(quatmul(qinv, qr),q);
     return qrr(Slice(1,4));
@@ -41,7 +48,8 @@ SX quatrot(const SX &q, const SX &r)
 
 SX quatrot_inverse(const SX &q, const SX &r)
 {
-    SX qinv = quatinv(q);
+    // SX qinv = quatinv(q);
+    SX qinv = quatconj(q);  // q_inv = q_conj for unit quaternions
     SX qr   = SX::vertcat({0, r});
     SX qrr  = quatmul(quatmul(q, qr),qinv);
     return qrr(Slice(1,4));
