@@ -198,7 +198,8 @@ void BoatDynamics::Hydrodynamics(const SX &state, const SX &control, const BoatP
 void BoatDynamics::Propulsion(const SX &state, const SX &control, const BoatProperties &prop, SX &Ftbrf, SX &Mtbrf)
 {
     // TODO: move constants into BoatProperties
-    // TODO: use control input thrust
+
+    SX thrust = control(3);
 
     // propmode: "endurance"
     // double Ftbrfx = 71;   // [N] in the Steady State
@@ -208,6 +209,7 @@ void BoatDynamics::Propulsion(const SX &state, const SX &control, const BoatProp
     double Ftbrfx = 93;   // [N] in the Steady State
     double Mtbrfx = 4.77; // [Nm], optimal torque (qopt). Prop rotates cw wrt brf_x => reaction
     Ftbrf = SX::vertcat({Ftbrfx, 0, 0});
+    Ftbrf = thrust * Ftbrf;
 
     // Parasite/Reaction Torque: Moment around y due to thrust
     // d_prop_vec = [0.6766 0.7716 0.8666]
@@ -217,6 +219,7 @@ void BoatDynamics::Propulsion(const SX &state, const SX &control, const BoatProp
     double Mrbrf = d_prop_cog*Ftbrfx;
 
     Mtbrf = SX::vertcat({Mtbrfx, Mrbrf, 0});
+    Mtbrf = thrust * Mtbrf;
 }
 
 BoatDynamics::BoatDynamics(const BoatProperties &prop)
@@ -250,9 +253,10 @@ BoatDynamics::BoatDynamics(const BoatProperties &prop)
     SX dA   = SX::sym("dA");     // Aileron deflection [reserved, but not used] [rad]
     SX dR   = SX::sym("dR");     // Rudder deflection [rad]
     // SX dE   = SX::sym("dE");     // Elevator deflection [positive down] [rad]
+    SX thrust = SX::sym("thrust"); // Thrust [-] (between 0.0 and 1.0)
 
     SX state    = SX::vertcat({v, W, r, q_BI});
-    SX control  = SX::vertcat({dF, dA, dR}); // TODO: why is elevator deflection dE not used?
+    SX control  = SX::vertcat({dF, dA, dR, thrust}); // TODO: why is elevator deflection dE not used?
 
     // Gravity
     SX Fgbrf = mass*quatrot(q_BI, SX::vertcat({0,0,g}));

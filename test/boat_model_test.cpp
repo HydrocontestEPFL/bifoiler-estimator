@@ -24,7 +24,7 @@ int main(int argc, char *argv[])
                          0, 0, -0.2231, // r
                          1, 0, 0, 0 // q
     });
-    u0 = DM::vertcat({0.1, 0.1, 0.1});
+    u0 = DM::vertcat({0.1, 0.1, 0.1, 0.9});
 
     BoatDynamics boat(prop);
 
