@@ -6,9 +6,17 @@ struct BoatProperties
     std::string name;
 
     struct {
+        double t_samp;
+    } estimator;
+
+    struct {
         double rho_sh2o;
         double g;
     } env;
+
+    struct {
+        double r_ant[3];
+    } sensor;
 
     struct {
         double mass;

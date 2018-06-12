@@ -9,9 +9,17 @@ BoatProperties BoatProperties::Load(const std::string &filename)
     BoatProperties prop;
     prop.name = config["name"].as<std::string>();
 
+    auto estimator = config["estimator"];
+    prop.estimator.t_samp = estimator["t_samp"].as<double>();
+
     auto env = config["env"];
     prop.env.rho_sh2o = env["rho_sh2o"].as<double>();
     prop.env.g = env["g"].as<double>();
+
+    auto sensor = config["sensor"];
+    prop.sensor.r_ant[0] = sensor["r_ant"][0].as<double>();
+    prop.sensor.r_ant[1] = sensor["r_ant"][1].as<double>();
+    prop.sensor.r_ant[2] = sensor["r_ant"][2].as<double>();
 
     auto inertia = config["inertia"];
     prop.inertia.mass = inertia["mass"].as<double>();

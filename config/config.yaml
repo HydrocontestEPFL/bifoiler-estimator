@@ -2,6 +2,9 @@
 
 name: "Bifoiler"
 
+estimator:
+  t_samp:               0.02      #[s] estimator sampling time
+
 # Environment
 env:
   rho_sh2o:             1025      #[kg m^-3] average sea water density at surface
