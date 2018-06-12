@@ -231,6 +231,105 @@ void BoatDynamics::Propulsion(const SX &state, const SX &control, const BoatProp
     Mtbrf = thrust * Mtbrf;
 }
 
+void quat_error_mult(const SX &a, const SX &qr, SX &q, SX &eta)
+{
+    // Attitude error transfer to reference quaternion q
+    const double f = 1;
+    eta = 1 - SX::dot(a, a) / 8;
+    SX nu = a / 2;
+    SX dq = f * SX::vertcat({eta, nu});
+
+    q = quatmul(dq, q);
+    q /= SX::norm_2(q); // enforce unit norm constraint
+}
+
+BoatDynamics::EstimatorJacobian(const SX &state, const SX &control, const BoatProperties &prop)
+{
+    double t_samp = prop.estimator.t_samp;
+
+    SX a = SX::sym("a", 3);      // Attitude error parametrisation
+    SX bg = SX::sym("bg", 3);    // IMU accelerometer bias
+    SX ba = SX::sym("ba", 3);    // IMU gyroscope bias
+
+    SX u = SX::sym("u", 3);      // Control: Flaps, Ailerons, Rudder
+    SX qr = SX::sym("qr", 4);     // reference, true of last iteration
+
+    // Erroneous Quaternion
+    SX q, eta;
+    quat_error_mult(a, qr, q, eta);
+
+    SX xe = SX::vertcat({v, W, r, a, bg, ba}); // estimator state
+    SX xs = SX::vertcat({v, W, r, q});
+
+    // (M)EKF dynamics/ Composition of total Jacobian
+
+    // Model Jacobian to get linearized model
+    // auto A_sys = jacobian_func(SXVector{xs, u});
+    SX A_sys = jacobian;
+
+    // df/da = df/dq*dq/da; Jq := dq/da
+    SX Jq = SX::jacobian(q, a);
+
+    // Matrix valued chain rule
+    SX Aa = A_sys(Slice(0, 9), Slice(9, 13)) * Jq;
+
+    // Attitude Dynamics (from Nokland)
+    SX f_att_nl = SX::vertcat({
+        0.5*(SX::eye(3) * eta + skew_mat(a)) * (W - bg),
+        SX::zeros(3,1)
+    });
+
+    // Attitude Dynamics (from Markley)
+    SX f_att_mk = SX::vertcat({
+        -bg - skew_mat(W)*a,
+        SX::zeros(3,1)
+    });
+
+    SX Jatt = SX::jacobian(f_att_mk, xe);
+
+    SX A = SX::vertcat({
+        SX::horzcat({A_sys(Slice(0, 9), Slice(0, 9)), Aa, SX::zeros(9, 6)}),
+        Jatt,
+        SX::zeros(3, xe.size1())
+    });
+    // A_func = Function("A_func", {xe, u, qr}, {F});
+
+    // Discretization
+    SX F = SX::eye(xe.size1()) + t_samp*A; // Euler
+    Function F_func = Function("F_func", {xe, u, qr}, {F});
+
+    // this->Estimator.F = F;
+    // this->Estimator.F_func = F_func;
+
+    // Outputmap and Sensitivity
+    SX g = SX::vertcat({0, 0, -prop.env.g}); // in BRF: z = up
+    SX r_ant = SX::vertcat({
+        prop.sensor.r_ant[0],
+        prop.sensor.r_ant[1],
+        prop.sensor.r_ant[2]
+    });
+    SX g_BRF = quatrot(q, g);
+
+    // Velocity is in BRF
+    SX y_vgns = quatrot_inverse(q, v) + quatrot_inverse(q, skew_mat(W) * r_ant);
+    SX y_wgyro = W + bg;
+    SX y_rgns = r + quatrot_inverse(q, r_ant);
+
+    //y_acc = v_dot_BRF - quatrot(q,[0; g]) + ba;
+    SX y_acc = -quatrot(q, SX::vertcat({0,g})) + ba;
+
+    // Complete Output-map h(x) and Output Sensitivity H
+    SX h = SX::vertcat({y_vgns, y_wgyro, y_rgns, y_acc});
+    Function h_func = Function("h_func", {xe,u, qr, r_ant}, {h});
+    SX H = SX::jacobian(h, xe);
+    Function H_func = Function("H_func", {xe,u, qr, r_ant}, {H});
+
+    // this->Estimator.h = h;
+    // this->Estimator.h_func = h_func;
+    // this->Estimator.H = H;
+    // this->Estimator.H_func = H_func;
+}
+
 BoatDynamics::BoatDynamics(const BoatProperties &prop)
 {
     double g = prop.env.g;
@@ -268,7 +367,7 @@ BoatDynamics::BoatDynamics(const BoatProperties &prop)
     SX control  = SX::vertcat({dF, dA, dR, thrust}); // TODO: why is elevator deflection dE not used?
 
     // Gravity
-    SX Fgbrf = mass*quatrot(q_BI, SX::vertcat({0,0,g}));
+    SX Fgbrf = mass*quatrot(q_BI, SX::vertcat({0,0,g})); // inertial reference frame, NED
 
     // Propulsion
     SX Ftbrf, Mtbrf;
@@ -331,94 +430,7 @@ BoatDynamics::BoatDynamics(const BoatProperties &prop)
     this->NumJacobian = jacobian_func;
     this->NumIntegrator = integrator_func;
 
-#if 1
-{
-    double t_samp = prop.estimator.t_samp; // TODO
-
-    SX a = SX::sym("a", 3);      // Attitude error parametrisation
-    SX bg = SX::sym("bg", 3);    // IMU accelerometer bias
-    SX ba = SX::sym("ba", 3);    // IMU gyroscope bias
-
-    SX u = SX::sym("u", 3);      // Control: Flaps, Ailerons, Rudder
-    SX qr = SX::sym("qr", 4);     // reference, true of last iteration
-
-    // Erroneous Quaternion
-    // [q, eta]    = quat_error_mult(a,qr);
-    // Attitude error transfer to reference quaternion q
-    const double f = 1;
-    SX eta = 1 - SX::dot(a, a) / 8;
-    SX nu = a / 2;
-    SX dq = f * SX::vertcat({eta, nu});
-
-    SX q = quatmul(dq, q);
-    q /= SX::norm_2(q); // enforce unit norm constraint
-
-    SX xe = SX::vertcat({v, W, r, a, bg, ba}); // estimator state
-    SX xs = SX::vertcat({v, W, r, q});
-
-
-    // (M)EKF dynamics/ Composition of total Jacobian
-
-    // Model Jacobian to get linearized model
-    // auto A_sys = jacobian_func(SXVector{xs, u});
-    SX A_sys = jacobian;
-
-    // df/da = df/dq*dq/da; Jq := dq/da
-    SX Jq = SX::jacobian(q, a);
-
-    // Matrix valued chain rule
-    SX Aa = A_sys(Slice(0, 9), Slice(9, 13)) * Jq;
-
-    // Attitude Dynamics (from Nokland)
-    SX f_att_nl = SX::vertcat({
-        0.5*(SX::eye(3) * eta + skew_mat(a)) * (W - bg),
-        SX::zeros(3,1)
-    });
-
-    // Attitude Dynamics (from Markley)
-    SX f_att_mk = SX::vertcat({
-        -bg - skew_mat(W)*a,
-        SX::zeros(3,1)
-    });
-
-    SX Jatt = SX::jacobian(f_att_mk, xe);
-
-    SX A = SX::vertcat({
-        SX::horzcat({A_sys(Slice(0, 9), Slice(0, 9)), Aa, SX::zeros(9, 6)}),
-        Jatt,
-        SX::zeros(3, xe.size1())
-    });
-    // A_func = Function("A_func", {xe, u, qr}, {F});
-
-    // Discretization
-    SX F = SX::eye(xe.size1()) + t_samp*A; // Euler
-    Function F_func = Function("F_func", {xe, u, qr}, {F});
-
-    // Outputmap and Sensitivity
-
-    SX g = SX::vertcat({0, 0, -prop.env.g}); // in BRF: z = up
-    SX r_ant = SX::vertcat({
-        prop.sensor.r_ant[0],
-        prop.sensor.r_ant[1],
-        prop.sensor.r_ant[2]
-    });
-    SX g_BRF = quatrot(q, g);
-
-    // Velocity is in BRF
-    SX y_vgns = quatrot_inverse(q, v) + quatrot_inverse(q, skew_mat(W) * r_ant);
-    SX y_wgyro = W + bg;
-    SX y_rgns = r + quatrot_inverse(q, r_ant);
-
-    //y_acc = v_dot_BRF - quatrot(q,[0; g]) + ba;
-    SX y_acc = -quatrot(q, SX::vertcat({0,g})) + ba;
-
-    // Complete Output-map h(x) and Output Sensitivity H
-    SX h = SX::vertcat({y_vgns, y_wgyro, y_rgns, y_acc});
-    Function h_func = Function("h_func", {xe,u, qr, r_ant}, {h});
-    SX H = SX::jacobian(h, xe);
-    Function H_func = Function("H_func", {xe,u, qr, r_ant}, {H});
-}
-#endif
+    EstimatorJacobian(state, control, prop);
 }
 
 } // namespace bifoiler
