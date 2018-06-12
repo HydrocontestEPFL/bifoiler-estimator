@@ -72,6 +72,15 @@ SX rk4_symbolic(const SX &x,
     return x + (h/6) * (k1 + 2*k2 + 2*k3 + k4);
 }
 
+SX skew_mat(const SX &v)
+{
+    return SX::vertcat({
+        SX::horzcat({0, -v(2), v(1)}),
+        SX::horzcat({v(2), 0, -v(0)}),
+        SX::horzcat({-v(1), v(0), 0})
+    });
+}
+
 // TODO: debug only, remove later
 DM x0, u0;
 static void print_expr(const char *name, SX &sym, SX &x, SX &u)
@@ -322,45 +331,47 @@ BoatDynamics::BoatDynamics(const BoatProperties &prop)
     this->NumJacobian = jacobian_func;
     this->NumIntegrator = integrator_func;
 
-#if 0
+#if 1
+{
+    double t_samp = prop.estimator.t_samp; // TODO
 
-    double t_samp = boat_pm.estimator.t_samp; // TODO
+    SX a = SX::sym("a", 3);      // Attitude error parametrisation
+    SX bg = SX::sym("bg", 3);    // IMU accelerometer bias
+    SX ba = SX::sym("ba", 3);    // IMU gyroscope bias
 
-    SX a = SX::sym('a',3);      // Attitude error parametrisation
-    SX bg = SX::sym('bg',3);    // IMU accelerometer bias
-    SX ba = SX::sym('ba',3);    // IMU gyroscope bias
+    SX u = SX::sym("u", 3);      // Control: Flaps, Ailerons, Rudder
+    SX qr = SX::sym("qr", 4);     // reference, true of last iteration
 
     // Erroneous Quaternion
     // [q, eta]    = quat_error_mult(a,qr);
-    {
-        // Attitude error transfer to reference quaternion q
-        const double f = 1;
-        SX eta = 1 - SX::dot(a,a) / 8;
-        SX nu = a / 2;
-        SX dq = f * SX::vertcat({eta, nu})
+    // Attitude error transfer to reference quaternion q
+    const double f = 1;
+    SX eta = 1 - SX::dot(a, a) / 8;
+    SX nu = a / 2;
+    SX dq = f * SX::vertcat({eta, nu});
 
-        SX q = quatmul(dq, q);
-        q /= q.norm_2(); // enforce unit norm constraint
-    }
+    SX q = quatmul(dq, q);
+    q /= SX::norm_2(q); // enforce unit norm constraint
 
-    xe = SX::vertcat({v, W, r, a, bg, ba}); // estimator state
-    xs = SX::vertcat({v, W, r, q});
+    SX xe = SX::vertcat({v, W, r, a, bg, ba}); // estimator state
+    SX xs = SX::vertcat({v, W, r, q});
 
 
     // (M)EKF dynamics/ Composition of total Jacobian
 
     // Model Jacobian to get linearized model
-    A_sys = jacobian_func(xs, u);
+    // auto A_sys = jacobian_func(SXVector{xs, u});
+    SX A_sys = jacobian;
 
     // df/da = df/dq*dq/da; Jq := dq/da
-    Jq = q.jacobian(a);
+    SX Jq = SX::jacobian(q, a);
 
     // Matrix valued chain rule
-    Aa = A_sys(Slice(0,9),Slice(9,13))*Jq;
+    SX Aa = A_sys(Slice(0, 9), Slice(9, 13)) * Jq;
 
     // Attitude Dynamics (from Nokland)
     SX f_att_nl = SX::vertcat({
-        0.5*(SX::eye(3) * eta + skew_mat(a))*(W-bg),
+        0.5*(SX::eye(3) * eta + skew_mat(a)) * (W - bg),
         SX::zeros(3,1)
     });
 
@@ -370,18 +381,43 @@ BoatDynamics::BoatDynamics(const BoatProperties &prop)
         SX::zeros(3,1)
     });
 
-    SX Jatt = SX::Jacobian(f_att_mk, xe);
+    SX Jatt = SX::jacobian(f_att_mk, xe);
 
-    A = SX::vertcat({
-        SX::horzcat({A_sys(Slice(0,9), Slice(0,9)), Aa, SX::zeros(9,6)}),
+    SX A = SX::vertcat({
+        SX::horzcat({A_sys(Slice(0, 9), Slice(0, 9)), Aa, SX::zeros(9, 6)}),
         Jatt,
         SX::zeros(3, xe.size1())
     });
     // A_func = Function("A_func", {xe, u, qr}, {F});
 
     // Discretization
-    F = SX::eye(xe.size1()) + t_samp*A; // Euler
-    F_func = Function("F_func", {xe, u, qr}, {F});
+    SX F = SX::eye(xe.size1()) + t_samp*A; // Euler
+    Function F_func = Function("F_func", {xe, u, qr}, {F});
+
+    // Outputmap and Sensitivity
+
+    SX g = SX::vertcat({0, 0, -prop.env.g}); // in BRF: z = up
+    SX r_ant = SX::vertcat({
+        prop.sensor.r_ant[0],
+        prop.sensor.r_ant[1],
+        prop.sensor.r_ant[2]
+    });
+    SX g_BRF = quatrot(q, g);
+
+    // Velocity is in BRF
+    SX y_vgns = quatrot_inverse(q, v) + quatrot_inverse(q, skew_mat(W) * r_ant);
+    SX y_wgyro = W + bg;
+    SX y_rgns = r + quatrot_inverse(q, r_ant);
+
+    //y_acc = v_dot_BRF - quatrot(q,[0; g]) + ba;
+    SX y_acc = -quatrot(q, SX::vertcat({0,g})) + ba;
+
+    // Complete Output-map h(x) and Output Sensitivity H
+    SX h = SX::vertcat({y_vgns, y_wgyro, y_rgns, y_acc});
+    Function h_func = Function("h_func", {xe,u, qr, r_ant}, {h});
+    SX H = SX::jacobian(h, xe);
+    Function H_func = Function("H_func", {xe,u, qr, r_ant}, {H});
+}
 #endif
 }
 
