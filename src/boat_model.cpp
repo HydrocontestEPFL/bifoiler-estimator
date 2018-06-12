@@ -330,25 +330,54 @@ BoatDynamics::BoatDynamics(const BoatProperties &prop)
     SX bg = SX::sym('bg',3);    // IMU accelerometer bias
     SX ba = SX::sym('ba',3);    // IMU gyroscope bias
 
-    // Attitude error transfer to reference quaternion q
-    const double f = 1;
-    SX eta = 1 - SX::dot(a,a) / 8;
-    SX nu = a / 2;
-    SX dq = f * SX::vertcat({eta, nu})
+    // Erroneous Quaternion
+    // [q, eta]    = quat_error_mult(a,qr);
+    {
+        // Attitude error transfer to reference quaternion q
+        const double f = 1;
+        SX eta = 1 - SX::dot(a,a) / 8;
+        SX nu = a / 2;
+        SX dq = f * SX::vertcat({eta, nu})
 
-    SX q = quatmul(dq, q);
-    q /= q.norm_2(); // enforce unit norm constraint
+        SX q = quatmul(dq, q);
+        q /= q.norm_2(); // enforce unit norm constraint
+    }
 
     xe = SX::vertcat({v, W, r, a, bg, ba}); // estimator state
     xs = SX::vertcat({v, W, r, q});
 
+
     // (M)EKF dynamics/ Composition of total Jacobian
+
+    // Model Jacobian to get linearized model
+    A_sys = jacobian_func(xs, u);
+
+    // df/da = df/dq*dq/da; Jq := dq/da
+    Jq = q.jacobian(a);
+
+    // Matrix valued chain rule
+    Aa = A_sys(Slice(0,9),Slice(9,13))*Jq;
+
+    // Attitude Dynamics (from Nokland)
+    SX f_att_nl = SX::vertcat({
+        0.5*(SX::eye(3) * eta + skew_mat(a))*(W-bg),
+        SX::zeros(3,1)
+    });
+
+    // Attitude Dynamics (from Markley)
+    SX f_att_mk = SX::vertcat({
+        -bg - skew_mat(W)*a,
+        SX::zeros(3,1)
+    });
+
+    SX Jatt = SX::Jacobian(f_att_mk, xe);
 
     A = SX::vertcat({
         SX::horzcat({A_sys(Slice(0,9), Slice(0,9)), Aa, SX::zeros(9,6)}),
         Jatt,
         SX::zeros(3, xe.size1())
     });
+    // A_func = Function("A_func", {xe, u, qr}, {F});
 
     // Discretization
     F = SX::eye(xe.size1()) + t_samp*A; // Euler
