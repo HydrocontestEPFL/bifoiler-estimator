@@ -9,9 +9,9 @@
 // Guesses of Process noise and Measurement Noise for the MTi-G-710 by XSENS
 
 template <typename Scalar>
-static Eigen<Scalar, 18, 18> process_noise_covariance(void)
+static Eigen::Matrix<Scalar, 18, 18> process_noise_covariance(void)
 {
-    Eigen<Scalar, 18, 18> Q;
+    Eigen::Matrix<Scalar, 18, 18> Q;
 
     // Process Noise/Disturbances
     // ---> How far  can i be of in 0.02 seconds? (2 cm/0.02s = 1m/s)
@@ -48,14 +48,14 @@ static Eigen<Scalar, 18, 18> process_noise_covariance(void)
     Q           = blkdiag(Qv, Qw,Qr, Qa, Qbg, Qba);  // Process noise
 #endif
     Q.setZero();
-    Q.diagonal().setpOnes(); // TODO: only for testing...
+    Q.diagonal().setOnes(); // TODO: only for testing...
 }
 
 template <typename Scalar>
-static Eigen<Scalar, 12, 12> measurement_noise_covariance(void)
+static Eigen::Matrix<Scalar, 12, 12> measurement_noise_covariance(void)
 {
     // Measurement Noise
-    Eigen<Scalar, 12, 12> R;
+    Eigen::Matrix<Scalar, 12, 12> R;
 
 #if 0
     // GNS Variance
@@ -73,7 +73,7 @@ static Eigen<Scalar, 12, 12> measurement_noise_covariance(void)
     Scalar rho_sigma = 150;                              // mug/sqrt(Hz)
     Scalar sigma_acc = rho_sigma / 1e6*9.81*t_samp*sqrt(10.f/t_samp);     // m/s
 
-    Eigen<Scalar, 3, 1> Rba
+    Eigen::Matrix<Scalar, 3, 1> Rba
     Rba.setOnes();
     Rba *= sigma_acc^2*eye(3); // m^2/s^2
 
@@ -82,7 +82,7 @@ static Eigen<Scalar, 12, 12> measurement_noise_covariance(void)
 #endif
 
     R.setZero();
-    R.diagonal().setpOnes(); // TODO: only for testing...
+    R.diagonal().setOnes(); // TODO: only for testing...
 
     return R;
 }

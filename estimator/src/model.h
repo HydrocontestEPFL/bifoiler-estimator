@@ -4,19 +4,19 @@
 #include <codegen/integrator.h>
 #include <codegen/propagation_matrix.h>
 #include <codegen/output_map.h>
-#include <codegen/output_map_jacobian.c.h>
+#include <codegen/output_map_jacobian.h>
 #include <Eigen/Dense>
 #include "covariance.h"
 
 namespace bifoiler {
 
-using Quaternion = Eigen::Matrix<Scalar, 4, 1>; // [w, x, y, z];
 
 struct Dynamics {
     using Scalar = double;
     using SystemState = Eigen::Matrix<Scalar, 13, 1>;
-    using EstimatorState = Eigen::Matrix<Scalar, 13, 1>;
+    using EstimatorState = Eigen::Matrix<Scalar, 18, 1>;
     using Control = Eigen::Matrix<Scalar, 3, 1>;
+    using Quaternion = Eigen::Matrix<Scalar, 4, 1>; // [w, x, y, z];
     enum {
         nx = EstimatorState::RowsAtCompileTime,
         nxs = SystemState::RowsAtCompileTime,
@@ -32,14 +32,14 @@ struct Dynamics {
 
     SystemState integrate(const SystemState &x, const Control &u)
     {
-        Scalar _x0[nxs], _u[nu], _x1[nxs], _dT[1];
+        Scalar _x0[nxs], _u[nu], _dT[1], _x1[nxs];
 
         SystemState::Map(_x0) = x;
         Control::Map(_u) = u;
         _dT[0] = 0.02; // TODO: parametrize
 
         // Setup function arguments
-        const Scalar *arg[2] = {_x0, _u, _dT};
+        const Scalar *arg[3] = {_x0, _u, _dT};
         Scalar *res[1] = {_x1};
 
         // call to CasADi generated C function
@@ -55,12 +55,12 @@ struct Dynamics {
     {
         Scalar _x[nx], _u[nu], _qref[4], _F[nx*nx];
 
-        SystemState::Map(_x0) = x;
+        EstimatorState::Map(_x) = x;
         Control::Map(_u) = u;
         Quaternion::Map(_qref) = qref;
 
         // Setup function arguments
-        Scalar *arg[2] = {_x0, _u, _qref};
+        const Scalar *arg[3] = {_x, _u, _qref};
         Scalar *res[1] = {_F};
 
         // call to CasADi generated C function
@@ -73,9 +73,10 @@ struct Dynamics {
 
 struct Observation {
     using Scalar = double;
-    using EstimatorState = Eigen::Matrix<Scalar, 13, 1>;
+    using EstimatorState = Eigen::Matrix<Scalar, 18, 1>;
     using Control = Eigen::Matrix<Scalar, 3, 1>;
     using Measurement = Eigen::Matrix<Scalar, 12, 1>;
+    using Quaternion = Eigen::Matrix<Scalar, 4, 1>; // [w, x, y, z];
     enum {
         nx = EstimatorState::RowsAtCompileTime,
         nu = Control::RowsAtCompileTime,
@@ -100,7 +101,7 @@ struct Observation {
         Quaternion::Map(_qref) = qref;
 
         // Setup function arguments
-        const Scalar *arg[2] = {_x, _u, _qref};
+        const Scalar *arg[3] = {_x, _u, _qref};
         Scalar *res[1] = {_z};
 
         // call to CasADi generated C function
@@ -116,12 +117,12 @@ struct Observation {
     {
         Scalar _x[nx], _u[nu], _qref[4], _H[nz*nx];
 
-        EstimatorState::Map(_x0) = x;
+        EstimatorState::Map(_x) = x;
         Control::Map(_u) = u;
-        Control::Map(_qref) = qref;
+        Quaternion::Map(_qref) = qref;
 
         // Setup function arguments
-        Scalar *arg[2] = {_x0, _u, _qref};
+        const Scalar *arg[3] = {_x, _u, _qref};
         Scalar *res[1] = {_H};
 
         // call to CasADi generated C function

@@ -5,14 +5,16 @@
 
 namespace bifoiler {
 
-MEKF::SystemState MEKF::get_system_state()
+template <typename Dynamics, typename Observation>
+typename MEKF<Dynamics, Observation>::SystemState MEKF<Dynamics, Observation>::get_system_state()
 {
     SystemState xs;
     xs << x.block<9,1>(0,0), qref;
     return xs;
 }
 
-MEKF::Quaternion MEKF::quatmul(const MEKF::Quaternion &q1, const MEKF::Quaternion &q2)
+template <typename Dynamics, typename Observation>
+typename MEKF<Dynamics, Observation>::Quaternion MEKF<Dynamics, Observation>::quatmul(const MEKF<Dynamics, Observation>::Quaternion &q1, const MEKF<Dynamics, Observation>::Quaternion &q2)
 {
     Quaternion q;
 
@@ -22,14 +24,15 @@ MEKF::Quaternion MEKF::quatmul(const MEKF::Quaternion &q1, const MEKF::Quaternio
     Scalar s2 = q2(0);
     Vector3 v2 = q2.block<3,1>(1,0);
 
-    Vector3 v = vx.cross(v2) + s1 * v2 + s2 * v1;
+    Vector3 v = v1.cross(v2) + s1 * v2 + s2 * v1;
     Scalar s = s1*s2 - v1.dot(v2);
 
     q << s, v;
     return q;
 }
 
-MEKF::Quaternion MEKF::quat_error_mult(const MEKF::Vector3 &a)
+template <typename Dynamics, typename Observation>
+typename MEKF<Dynamics, Observation>::Quaternion MEKF<Dynamics, Observation>::quat_error_mult(const MEKF<Dynamics, Observation>::Vector3 &a)
 {
     Quaternion dq;
 
@@ -49,14 +52,16 @@ MEKF::Quaternion MEKF::quat_error_mult(const MEKF::Vector3 &a)
     return dq;
 }
 
-void MEKF::MEKF(const SystemState &x0, const StateCov &P0) : P(P0)
+template <typename Dynamics, typename Observation>
+MEKF<Dynamics, Observation>::MEKF(const SystemState &x0, const StateCov &P0) : P(P0)
 {
     x << x0.block<9,1>(0,0);
     x.block<9,1>(9,0).setZero();
     I.setIdentity();
 }
 
-void MEKF::predict(const Control &u)
+template <typename Dynamics, typename Observation>
+void MEKF<Dynamics, Observation>::predict(const Control &u)
 {
     Eigen::Matrix<Scalar, nx, nx> F;
     SystemState xs;
@@ -74,7 +79,8 @@ void MEKF::predict(const Control &u)
     P = F * P * F.transpose() + f.Q;
 }
 
-void MEKF::correct(const Measurement &z)
+template <typename Dynamics, typename Observation>
+void MEKF<Dynamics, Observation>::correct(const Control &u, const Measurement &z)
 {
     Measurement y;                      // innovation
     Eigen::Matrix<Scalar, nz, nx> H;    // jacobian of h
@@ -107,10 +113,11 @@ void MEKF::correct(const Measurement &z)
     x.block<3,1>(9,0).setZero();
 }
 
-void MEKF::update(const Control &u, const Measurement &z)
+template <typename Dynamics, typename Observation>
+void MEKF<Dynamics, Observation>::update(const Control &u, const Measurement &z)
 {
     predict(u);
-    correct(z);
+    correct(u, z);
 }
 
 } // namespace bifoiler

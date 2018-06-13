@@ -3,7 +3,8 @@
 
 namespace bifoiler {
 
-class MEKF<typename Dynamics, typename Observation> {
+template <typename Dynamics, typename Observation>
+class MEKF {
 public:
     using Scalar = typename Dynamics::EstimatorState::Scalar;
     using EstimatorState = Eigen::Matrix<Scalar, 18, 1>; // [v, w, r, a, bg, ba];
@@ -15,7 +16,7 @@ public:
     using Vector3 = const Eigen::Matrix<Scalar, 3, 1>;
     enum {
         nx = EstimatorState::RowsAtCompileTime,
-        nxs = SystState::RowsAtCompileTime,
+        nxs = SystemState::RowsAtCompileTime,
         nz = Measurement::RowsAtCompileTime,
     };
 
@@ -34,13 +35,13 @@ private:
 
 public:
     SystemState get_system_state();
-    EstimatorState get_system_state() { return x; }
+    EstimatorState get_estimator_state() { return x; }
     StateCov get_state_covariance() { return P; }
 
     MEKF(const SystemState &x0, const StateCov &P0);
 
     void predict(const Control &u);
-    void correct(const Measurement &z);
+    void correct(const Control &u, const Measurement &z);
     void update(const Control &u, const Measurement &z);
 
 };
