@@ -1,11 +1,13 @@
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
 
+#include "MEKF.h"
+
 namespace bifoiler {
 
-MEKF::SysState MEKF::get_system_state()
+MEKF::SystemState MEKF::get_system_state()
 {
-    SysState xs;
+    SystemState xs;
     xs << x.block<9,1>(0,0), qref;
     return xs;
 }
@@ -27,7 +29,7 @@ MEKF::Quaternion MEKF::quatmul(const MEKF::Quaternion &q1, const MEKF::Quaternio
     return q;
 }
 
-MEKF::Quaternion MEKF::_qerr(const MEKF::Vector3 &a)
+MEKF::Quaternion MEKF::quat_error_mult(const MEKF::Vector3 &a)
 {
     Quaternion dq;
 
@@ -47,24 +49,26 @@ MEKF::Quaternion MEKF::_qerr(const MEKF::Vector3 &a)
     return dq;
 }
 
-void MEKF::MEKF()
+void MEKF::MEKF(const SystemState &x0, const StateCov &P0) : P(P0)
 {
+    x << x0.block<9,1>(0,0);
+    x.block<9,1>(9,0).setZero();
     I.setIdentity();
 }
 
 void MEKF::predict(const Control &u)
 {
     Eigen::Matrix<Scalar, nx, nx> F;
-    SysState x_sys;
+    SystemState xs;
 
-    x_sys = get_system_state();
+    xs = get_system_state();
 
     // numerical integration
-    x_sys = f.integrate(x_sys, u);
+    xs = f.integrate(xs, u);
 
-    F = f.jacobian(x, u, qref);
+    F = f.propagation_matrix(x, u, qref);
 
-    x << x_sys.block<9,1>(0,0), F.block<9,18>(9,0)*x;
+    x << xs.block<9,1>(0,0), F.block<9,18>(9,0)*x;
 
     // Covariance prediction
     P = F * P * F.transpose() + f.Q;
@@ -93,7 +97,7 @@ void MEKF::correct(const Measurement &z)
 
     // Attitude error transfer to reference quaternion qref
     a << x.block<3,1>(9,0);
-    dq = _qerr(a);
+    dq = quat_error_mult(a);
     qref = quatmul(dq, qref);
 
     // enforce unit norm constraint
