@@ -26,6 +26,23 @@ include_directories(
     ${CASADI_INCLUDE_DIR}
     )
 
+# Estimator code generator
+add_executable(
+    estimator_codegen
+    src/estimator_codegen.cpp
+    src/estimator_model.cpp
+    src/boat_model.cpp
+    src/boat_properties.cpp
+    src/boat_math.cpp
+    )
+
+target_link_libraries(
+    estimator_codegen
+    casadi
+    yaml-cpp
+    )
+
+# CasADi tests
 add_executable(
     casadi_test
     test/casadi_test.cpp
@@ -36,6 +53,7 @@ target_link_libraries(
     casadi
     )
 
+# YAML config tests
 add_executable(
     config_test
     test/config_test.cpp
@@ -46,6 +64,7 @@ target_link_libraries(
     yaml-cpp
     )
 
+# Boat model tests
 add_executable(
     boat_model_test
     test/boat_model_test.cpp
@@ -60,6 +79,7 @@ target_link_libraries(
     yaml-cpp
     )
 
+# CasADi codegen tests
 add_executable(
     codegen_test
     test/codegen_test.cpp
