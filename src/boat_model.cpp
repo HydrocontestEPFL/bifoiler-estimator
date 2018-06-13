@@ -237,9 +237,9 @@ BoatDynamics::BoatDynamics(const BoatProperties &prop)
     // Differential equation
     SX dynamics = SX::vertcat({v_dot_brf, W_dot_brf, r_dot_irf, q_BI_dot});
 
-    Function dynamics_func = Function("dynamics", {state, control}, {dynamics});
+    Function dynamics_func = Function("dynamics", {state, control}, {densify(dynamics)});
     SX jacobian = SX::jacobian(dynamics, state);
-    Function jacobian_func = Function("jacobian", {state, control}, {jacobian});
+    Function jacobian_func = Function("jacobian", {state, control}, {densify(jacobian)});
 
     // define RK4 integrator scheme
     SX X = SX::sym("X", state.size1());
@@ -248,7 +248,7 @@ BoatDynamics::BoatDynamics(const BoatProperties &prop)
 
     // get symbolic expression for RK4 integrator
     SX integrator = rk4_symbolic(X, U, dynamics_func, dT);
-    Function integrator_func = Function("integrator", {X,U,dT},{integrator});
+    Function integrator_func = Function("integrator", {X,U,dT},{densify(integrator)});
 
     // assign class attributes
     this->State = state;

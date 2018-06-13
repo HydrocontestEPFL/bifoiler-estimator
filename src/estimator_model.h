@@ -13,6 +13,11 @@ class EstimatorModel
 public:
     EstimatorModel(BoatDynamics &dynamics, const BoatProperties &prop);
 
+    casadi::SX xs_sym;
+    casadi::SX xe_sym;
+    casadi::SX qr_sym;
+    casadi::SX u_sym;
+
     casadi::SX F; // propagation matrix
     casadi::SX A; // Estimator jacobian
     casadi::SX h;

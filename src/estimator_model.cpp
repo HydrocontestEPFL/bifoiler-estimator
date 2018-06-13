@@ -72,11 +72,11 @@ EstimatorModel::EstimatorModel(BoatDynamics &dynamics, const BoatProperties &pro
         Jatt,
         SX::zeros(3, xe.size1())
     });
-    Function A_func = Function("A_func", {xe, u, qr}, {F});
+    Function A_func = Function("A_func", {xe, u, qr}, {densify(A)});
 
     // Discretization
     SX F = SX::eye(xe.size1()) + t_samp*A; // Euler
-    Function F_func = Function("F_func", {xe, u, qr}, {F});
+    Function F_func = Function("F_func", {xe, u, qr}, {densify(F)});
 
     this->F = A;
     this->A_func = A_func;
@@ -102,14 +102,19 @@ EstimatorModel::EstimatorModel(BoatDynamics &dynamics, const BoatProperties &pro
 
     // Complete Output-map h(x) and Output Sensitivity H
     SX h = SX::vertcat({y_vgns, y_wgyro, y_rgns, y_acc});
-    Function h_func = Function("h_func", {xe, u, qr}, {h});
+    Function h_func = Function("h_func", {xe, u, qr}, {densify(h)});
     SX H = SX::jacobian(h, xe);
-    Function H_func = Function("H_func", {xe, u, qr}, {H});
+    Function H_func = Function("H_func", {xe, u, qr}, {densify(H)});
 
     this->h = h;
     this->h_func = h_func;
     this->H = H;
     this->H_func = H_func;
+
+    this->xs_sym = xs;
+    this->xe_sym = xe;
+    this->qr_sym = qr;
+    this->u_sym = u;
 }
 
 } // namespace bifoiler
