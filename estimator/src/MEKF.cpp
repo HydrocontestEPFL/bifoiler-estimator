@@ -53,8 +53,13 @@ MEKF::Quaternion MEKF::quat_error_mult(const MEKF::Vector3 &a)
 
 MEKF::MEKF(const SystemState &x0, const StateCov &P0) : P(P0)
 {
+    // initialize estimator state
     x.block<9,1>(0,0) = x0.block<9,1>(0,0);
     x.block<9,1>(9,0).setZero();
+
+    // initialize reference quaternion
+    qref << x0.block<4,1>(9,0);
+
     I.setIdentity();
 }
 
