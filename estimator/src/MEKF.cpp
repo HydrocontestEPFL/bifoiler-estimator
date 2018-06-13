@@ -1,3 +1,5 @@
+#include <iostream> // TODO: remove later
+
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
 
@@ -66,7 +68,12 @@ void MEKF::predict(const Control &u)
     // numerical integration
     xs = f.integrate(xs, u);
 
+    std::cout << "xs = \n" << xs << std::endl;
+
     F = f.propagation_matrix(x, u, qref);
+
+    std::cout << "F = \n" << F << std::endl;
+    std::cout << "Q = \n" << f.Q << std::endl;
 
     x << xs.block<9,1>(0,0), F.block<9,18>(9,0)*x;
 
@@ -83,13 +90,18 @@ void MEKF::correct(const Control &u, const Measurement &z)
     Quaternion dq;                      // attitude error quaternion
 
     H = h.jacobian(x, u, qref);
+    std::cout << "H = \n" << H << std::endl;
     S = H * P * H.transpose() + h.R;
+    std::cout << "S = \n" << S << std::endl;
+    std::cout << "R = \n" << h.R << std::endl;
 
     // efficiently compute: K = P * H.transpose() * S.inverse();
     K = S.llt().solve(H * P).transpose();
+    std::cout << "K = \n" << K << std::endl;
 
     y = z - h(x, u, qref);
     IKH = (I - K * H);
+    std::cout << "y = \n" << y << std::endl;
 
     // Measurement update
     x = x + K * y;
@@ -102,6 +114,7 @@ void MEKF::correct(const Control &u, const Measurement &z)
 
     // enforce unit norm constraint
     qref /= qref.norm();
+    std::cout << "qref = \n" << qref << std::endl;
 
     // reset MEKF error angle
     x.block<3,1>(9,0).setZero();

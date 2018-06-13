@@ -35,7 +35,7 @@ int main()
     MEKF::StateCov P;
 
     xs = estimator.get_system_state();
-    std::cout << "x = \n" << xs << "\n";
+    std::cout << "xs = \n" << xs << "\n";
 
     MEKF::Control u;
     MEKF::Measurement z;
@@ -47,8 +47,20 @@ int main()
          0.1, 0, 0, // r_I
          0, 0, -9.81; // acc_B
 
-    std::cout << "foo\n";
-    estimator.update(u, z);
+    std::cout << "estimator.predict(u)\n";
+    estimator.predict(u);
+
+    xs = estimator.get_system_state();
+    std::cout << "xs = \n" << xs << "\n";
+
+    xe = estimator.get_estimator_state();
+    std::cout << "xe = \n" << xe << "\n";
+
+    P = estimator.get_state_covariance();
+    std::cout << "P = \n" << P << "\n";
+
+    std::cout << "estimator.correct(u, z)\n";
+    estimator.correct(u, z);
 
     xs = estimator.get_system_state();
     std::cout << "xs = \n" << xs << "\n";
