@@ -51,6 +51,7 @@ add_executable(
     test/boat_model_test.cpp
     src/boat_model.cpp
     src/boat_properties.cpp
+    src/boat_math.cpp
     )
 
 target_link_libraries(
