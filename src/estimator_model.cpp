@@ -72,12 +72,14 @@ EstimatorModel::EstimatorModel(BoatDynamics &dynamics, const BoatProperties &pro
         Jatt,
         SX::zeros(3, xe.size1())
     });
-    // A_func = Function("A_func", {xe, u, qr}, {F});
+    Function A_func = Function("A_func", {xe, u, qr}, {F});
 
     // Discretization
     SX F = SX::eye(xe.size1()) + t_samp*A; // Euler
     Function F_func = Function("F_func", {xe, u, qr}, {F});
 
+    this->F = A;
+    this->A_func = A_func;
     this->F = F;
     this->F_func = F_func;
 
