@@ -35,10 +35,6 @@ public:
                            casadi::SX &Ftbrf,
                            casadi::SX &Mtbrf);
 private:
-    void EstimatorJacobian(const casadi::SX &state,
-                           const casadi::SX &control,
-                           const BoatProperties &prop);
-
     casadi::SX State;
     casadi::SX Control;
     casadi::SX SymDynamics;
@@ -48,15 +44,6 @@ private:
     casadi::Function NumDynamics;
     casadi::Function NumIntegrator;
     casadi::Function NumJacobian;
-
-    struct {
-        casadi::SX F;
-        casadi::SX h;
-        casadi::SX H;
-        casadi::Function F_func;
-        casadi::Function h_func;
-        casadi::Function H_func;
-    } Estimator;
 };
 
 } // namespace bifoiler
