@@ -39,20 +39,13 @@ EstimatorModel::EstimatorModel(BoatDynamics &dynamics, const BoatProperties &pro
     SX v = xs(Slice(0,3));
     SX W = xs(Slice(3,6));
     SX r = xs(Slice(6,9));
+    SX q_xs = xs(Slice(9,13));
     SX xe = SX::vertcat({v, W, r, a, bg, ba}); // estimator state
 
     // (M)EKF dynamics/ Composition of total Jacobian
 
     // Model Jacobian to get linearized model
-    // auto A_sys = jacobian_func(SXVector{xs, u});
-    SX A_sys = dynamics.getSymbolicJacobian();
-    /* TODO:
-    "Code generation is not possible since variables [q_1, q_2, q_3, q_0] are free"
-
-    in A_sys uses the symbol "q" which should correspond to the local SX q.
-    SX q_BI = SX::sym("q", 4);
-    How can I substitute "q" by q?
-    */
+    SX A_sys = substitute(dynamics.getSymbolicJacobian(), q_xs, q);
 
     // df/da = df/dq*dq/da; Jq := dq/da
     SX Jq = SX::jacobian(q, a);
