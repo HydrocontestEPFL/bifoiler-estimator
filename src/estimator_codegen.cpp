@@ -7,9 +7,16 @@
 using namespace casadi;
 using namespace bifoiler;
 
+static void generate(Function func, const char *dir, const char *name, Dict &opt)
+{
+    std::cout << "generate: " << dir << "/" << name << ".c\n";
+    func.generate(name, opt);
+}
+
 int main(int argc, char *argv[])
 {
     char *dir = NULL;
+    const char *outdir = ".";
 
     if (argc < 2) {
         std::cout << "usage: " << argv[0] << " config.yaml [codegen/dir]" << std::endl;
@@ -25,11 +32,13 @@ int main(int argc, char *argv[])
         char buf[1000];
         int err;
 
+
+        outdir = argv[2];
         dir = getcwd(buf, sizeof(buf));
-        err = chdir(argv[2]);
+        err = chdir(outdir);
 
         if (err != 0) {
-            std::cout << "error with codegen directory: " << argv[2] << std::endl;
+            std::cout << "error can't chdir to directory: " << argv[2] << std::endl;
             std::cout << "does it exist?" << std::endl;
             return -1;
         }
@@ -40,23 +49,13 @@ int main(int argc, char *argv[])
 
     Dict opt = {
         {"with_header", true},
-        {"verbose", true},
     };
-    std::cout << "generate: integrator.c\n";
-    boat_model.getNumericIntegrator().generate("integrator", opt);
 
-    std::cout << "F =\n" << estimator.F << "\n";
-    std::cout << "generate: F_func.c\n";
-    estimator.F_func.generate("F_func", opt);
-
-    // std::cout << "h =\n" << estimator.h << "\n";
-    std::cout << "generate: h_func.c\n";
-    estimator.h_func.generate("h_func", opt);
-
-    // std::cout << "H =\n" << estimator.H << "\n";
-    std::cout << "generate: H_func.c\n";
-    estimator.H_func.generate("H_func", opt);
-
+    generate(boat_model.getNumericIntegrator(), outdir, "integrator", opt);
+    generate(estimator.A_func, outdir, "estimator_jacobian", opt);
+    generate(estimator.F_func, outdir, "propagation_matrix", opt);
+    generate(estimator.h_func, outdir, "output_map", opt);
+    generate(estimator.H_func, outdir, "output_map_jacobian", opt);
 
     // return to old working directory
     if (dir != NULL) {
