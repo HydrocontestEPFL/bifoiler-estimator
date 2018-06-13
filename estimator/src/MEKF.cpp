@@ -5,16 +5,14 @@
 
 namespace bifoiler {
 
-template <typename Dynamics, typename Observation>
-typename MEKF<Dynamics, Observation>::SystemState MEKF<Dynamics, Observation>::get_system_state()
+MEKF::SystemState MEKF::get_system_state()
 {
     SystemState xs;
     xs << x.block<9,1>(0,0), qref;
     return xs;
 }
 
-template <typename Dynamics, typename Observation>
-typename MEKF<Dynamics, Observation>::Quaternion MEKF<Dynamics, Observation>::quatmul(const MEKF<Dynamics, Observation>::Quaternion &q1, const MEKF<Dynamics, Observation>::Quaternion &q2)
+MEKF::Quaternion MEKF::quatmul(const MEKF::Quaternion &q1, const MEKF::Quaternion &q2)
 {
     Quaternion q;
 
@@ -31,8 +29,7 @@ typename MEKF<Dynamics, Observation>::Quaternion MEKF<Dynamics, Observation>::qu
     return q;
 }
 
-template <typename Dynamics, typename Observation>
-typename MEKF<Dynamics, Observation>::Quaternion MEKF<Dynamics, Observation>::quat_error_mult(const MEKF<Dynamics, Observation>::Vector3 &a)
+MEKF::Quaternion MEKF::quat_error_mult(const MEKF::Vector3 &a)
 {
     Quaternion dq;
 
@@ -52,16 +49,14 @@ typename MEKF<Dynamics, Observation>::Quaternion MEKF<Dynamics, Observation>::qu
     return dq;
 }
 
-template <typename Dynamics, typename Observation>
-MEKF<Dynamics, Observation>::MEKF(const SystemState &x0, const StateCov &P0) : P(P0)
+MEKF::MEKF(const SystemState &x0, const StateCov &P0) : P(P0)
 {
-    x << x0.block<9,1>(0,0);
+    x.block<9,1>(0,0) = x0.block<9,1>(0,0);
     x.block<9,1>(9,0).setZero();
     I.setIdentity();
 }
 
-template <typename Dynamics, typename Observation>
-void MEKF<Dynamics, Observation>::predict(const Control &u)
+void MEKF::predict(const Control &u)
 {
     Eigen::Matrix<Scalar, nx, nx> F;
     SystemState xs;
@@ -79,8 +74,7 @@ void MEKF<Dynamics, Observation>::predict(const Control &u)
     P = F * P * F.transpose() + f.Q;
 }
 
-template <typename Dynamics, typename Observation>
-void MEKF<Dynamics, Observation>::correct(const Control &u, const Measurement &z)
+void MEKF::correct(const Control &u, const Measurement &z)
 {
     Measurement y;                      // innovation
     Eigen::Matrix<Scalar, nz, nx> H;    // jacobian of h
@@ -94,7 +88,7 @@ void MEKF<Dynamics, Observation>::correct(const Control &u, const Measurement &z
     // efficiently compute: K = P * H.transpose() * S.inverse();
     K = S.llt().solve(H * P).transpose();
 
-    y = z - h(x);
+    y = z - h(x, u, qref);
     IKH = (I - K * H);
 
     // Measurement update
@@ -113,8 +107,7 @@ void MEKF<Dynamics, Observation>::correct(const Control &u, const Measurement &z
     x.block<3,1>(9,0).setZero();
 }
 
-template <typename Dynamics, typename Observation>
-void MEKF<Dynamics, Observation>::update(const Control &u, const Measurement &z)
+void MEKF::update(const Control &u, const Measurement &z)
 {
     predict(u);
     correct(u, z);

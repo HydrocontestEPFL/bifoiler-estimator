@@ -1,19 +1,21 @@
 #ifndef ESTIMATOR_H
 #define ESTIMATOR_H
 
+#include <Eigen/Dense>
+#include "model.h"
+
 namespace bifoiler {
 
-template <typename Dynamics, typename Observation>
 class MEKF {
 public:
-    using Scalar = typename Dynamics::EstimatorState::Scalar;
+    using Scalar = Dynamics::EstimatorState::Scalar;
     using EstimatorState = Eigen::Matrix<Scalar, 18, 1>; // [v, w, r, a, bg, ba];
     using SystemState = Eigen::Matrix<Scalar, 13, 1>; // [v, w, r, q];
-    using Control = typename Dynamics::Control;
-    using Measurement = typename Observation::Measurement;
+    using Control = Dynamics::Control;
+    using Measurement = Observation::Measurement;
     using StateCov = Eigen::Matrix<Scalar, 18, 18>;
     using Quaternion = Eigen::Matrix<Scalar, 4, 1>; // [w, x, y, z];
-    using Vector3 = const Eigen::Matrix<Scalar, 3, 1>;
+    using Vector3 = Eigen::Matrix<Scalar, 3, 1>;
     enum {
         nx = EstimatorState::RowsAtCompileTime,
         nxs = SystemState::RowsAtCompileTime,

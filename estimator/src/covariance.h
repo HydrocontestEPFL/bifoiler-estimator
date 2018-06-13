@@ -49,6 +49,8 @@ static Eigen::Matrix<Scalar, 18, 18> process_noise_covariance(void)
 #endif
     Q.setZero();
     Q.diagonal().setOnes(); // TODO: only for testing...
+
+    return Q;
 }
 
 template <typename Scalar>
