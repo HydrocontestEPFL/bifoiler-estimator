@@ -5,6 +5,7 @@
 
 #include <casadi/casadi.hpp>
 #include <boat_model.h>
+#include <estimator_model.h>
 
 using namespace casadi;
 using namespace bifoiler;
@@ -40,6 +41,20 @@ DM cvodes_solve(Function &cvodes_integrator, const DM &x0, const DM &u)
     return out["xf"];
 }
 
+DM h_func(Function h, DM xs, DM u)
+{
+    DM qr = xs(Slice(9,13));
+    DM xe = DM::vertcat({
+        xs(Slice(0,9)),
+        DM::zeros(3,1), // a attitude error parametrization
+        DM::zeros(3,1), // bg gyro bias
+        DM::zeros(3,1)  // ba accelerometer bias
+    });
+
+    DMVector z = h(DMVector{xe, u, qr});
+    return z[0];
+}
+
 int main(int argc, char *argv[])
 {
     if (argc < 2) {
@@ -49,11 +64,11 @@ int main(int argc, char *argv[])
 
     std::ofstream sim_x("sim_x.csv");
     std::ofstream sim_u("sim_u.csv");
-    // std::ofstream sim_z("sim_z.csv");
+    std::ofstream sim_z("sim_z.csv");
 
     sim_x << "vx,vy,vz,wx,wy,wz,rx,ry,rz,q0,q1,q2,q3\n";
     sim_u << "flaps,aileron,rudder,thrust\n";
-    // sim_z << "vx,vy,vz,wx,wy,wz,rx,ry,rz,ax,ay,az\n";
+    sim_z << "vx,vy,vz,wx,wy,wz,rx,ry,rz,ax,ay,az\n";
 
 
     std::cout << "load config file: " << argv[1] << std::endl;
@@ -61,10 +76,13 @@ int main(int argc, char *argv[])
     BoatProperties prop = BoatProperties::Load(config_file);
 
     BoatDynamics boat_model(prop);
+    EstimatorModel estimator(boat_model, prop);
 
     SX dynamics = boat_model.getSymbolicDynamics();
     SX state = boat_model.getSymbolicState();
     SX control = boat_model.getSymbolicControl();   // Control: Flaps, Ailerons, Rudder
+
+    Function output_map = estimator.h_func;
 
     const double h = prop.estimator.t_samp;
     SXDict ode = {{"x", state}, {"p", control}, {"ode", dynamics}};
@@ -90,9 +108,14 @@ int main(int argc, char *argv[])
             0.8 // Thrust
         });
 
+        DM z = h_func(output_map, x, u);
+
         // std::cout << x << std::endl;
+        // std::cout << z << std::endl;
+
         csv_write_line(sim_x, x);
         csv_write_line(sim_u, u);
+        csv_write_line(sim_z, z);
         x = cvodes_solve(CVODES_INT, x, u);
     }
 

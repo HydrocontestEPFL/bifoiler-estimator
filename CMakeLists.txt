@@ -47,6 +47,7 @@ add_executable(
     simulation
     src/simulation.cpp
     src/boat_model.cpp
+    src/estimator_model.cpp
     src/boat_properties.cpp
     src/boat_math.cpp
     )
