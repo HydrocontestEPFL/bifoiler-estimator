@@ -12,11 +12,19 @@
 using namespace bifoiler;
 using namespace Eigen;
 
-// MEKF::Measurement add_noise(MEKF::Measurement z)
-// {
-//     static std::default_random_engine generator;
-//     static std::normal_distribution<double> noise(0, 1);
-// }
+MEKF::Measurement add_noise(MEKF::Measurement z)
+{
+    static std::default_random_engine generator;
+    static std::normal_distribution<double> noise(0, 1);
+
+    auto Q = measurement_noise_covariance<double>();
+    MEKF::Measurement variance = Q.diagonal();
+
+    for (int i = 0; i < z.size(); i++) {
+        z(i) += sqrt(variance(i)) * noise(generator); // additive gaussian noise
+    }
+    return z;
+}
 
 template <typename vector>
 int csv_parse_line(vector &out, std::ifstream &in)
@@ -98,6 +106,8 @@ int main(int argc, char *argv[])
         run &= (csv_parse_line<MEKF::Measurement>(z, sim_z) == 0);
         // std::cout << "u = \n" << u.transpose() << "\n";
         // std::cout << "z = \n" << z.transpose() << "\n";
+
+        z = add_noise(z);
 
         estimator.update(u, z);
 
