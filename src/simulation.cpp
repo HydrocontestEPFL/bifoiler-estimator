@@ -41,7 +41,7 @@ DM cvodes_solve(Function &cvodes_integrator, const DM &x0, const DM &u)
 int main(int argc, char *argv[])
 {
     if (argc < 2) {
-        std::cout << "usage: " << argv[0] << " config.yaml [output/dir]" << std::endl;
+        std::cout << "usage: " << argv[0] << " config.yaml" << std::endl;
         return -1;
     }
 
@@ -53,6 +53,8 @@ int main(int argc, char *argv[])
     sim_u << "flaps,aileron,rudder,thrust\n";
     // sim_z << "vx,vy,vz,wx,wy,wz,rx,ry,rz,ax,ay,az\n";
 
+
+    std::cout << "load config file: " << argv[1] << std::endl;
     std::string config_file(argv[1]);
     BoatProperties prop = BoatProperties::Load(config_file);
 
@@ -67,20 +69,28 @@ int main(int argc, char *argv[])
     Dict opts = {{"tf", h}};
     Function CVODES_INT = integrator("CVODES_INT", "cvodes", ode, opts);
 
-    const double SIM_TIME = 20; // [s]
+    const double SIM_TIME = 10; // [s]
     DM x = DM::vertcat({
         5, 0, 0,    // v0 [m/s] in BRF
         0, 0, 0,    // w0 [rad/s]
-        0, 0, -0.2, // r0 [m] in IRF (NED)
+        0, 0, 0, // r0 [m] in IRF (NED)
         1, 0, 0, 0  // q0
     });
 
-    DM u = DM::vertcat({0, 0, 0, 0.5}); // Flaps, Aileron, Rudder, Thrust
-
+    std::cout << "start simulation" << std::endl;
     for (double t = 0; t < SIM_TIME; t += h) {
-        std::cout << x << std::endl;
+        DM u = DM::vertcat({
+            0, // Flaps
+            0, // Aileron
+            3*0.017*sin(2*M_PI*0.1*t), // Rudder
+            0.5 // Thrust
+        });
+
+        // std::cout << x << std::endl;
         csv_write_line(sim_x, x);
         csv_write_line(sim_u, u);
         x = cvodes_solve(CVODES_INT, x, u);
     }
+
+    std::cout << "DONE" << std::endl;
 }
