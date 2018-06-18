@@ -9,6 +9,8 @@
 using namespace casadi;
 using namespace bifoiler;
 
+#define DEG2RAD(x) ((x) * M_PI / 180)
+
 void csv_write_line(std::ofstream &out, DM x)
 {
     for (int i = 0; i < x.size1(); i++) {
@@ -80,10 +82,12 @@ int main(int argc, char *argv[])
     std::cout << "start simulation" << std::endl;
     for (double t = 0; t < SIM_TIME; t += h) {
         DM u = DM::vertcat({
-            0, // Flaps
-            0, // Aileron
-            3*0.017*sin(2*M_PI*0.1*t), // Rudder
-            0.5 // Thrust
+            // 0, // Flaps
+            // 0, // Aileron
+            DEG2RAD(3)*sin(2*M_PI*0.5*t), // Flaps
+            DEG2RAD(3)*sin(2*M_PI*0.5*t), // Aileron
+            DEG2RAD(3)*sin(2*M_PI*0.1*t), // Rudder
+            0.8 // Thrust
         });
 
         // std::cout << x << std::endl;
