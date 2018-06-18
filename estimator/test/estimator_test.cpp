@@ -27,6 +27,18 @@ MEKF::Measurement add_noise(MEKF::Measurement z)
 }
 
 template <typename vector>
+void csv_write_line(std::ofstream &out, vector &x)
+{
+    for (int i = 0; i < x.size(); i++) {
+        if (i != 0) {
+            out << ",";
+        }
+        out << x(i);
+    }
+    out << "\n";
+}
+
+template <typename vector>
 int csv_parse_line(vector &out, std::ifstream &in)
 {
     std::string line;
@@ -65,6 +77,9 @@ int main(int argc, char *argv[])
     std::ifstream sim_x(sim_csv_path + "/sim_x.csv");
     std::ifstream sim_u(sim_csv_path + "/sim_u.csv");
     std::ifstream sim_z(sim_csv_path + "/sim_z.csv");
+
+    std::ofstream estimator_log("estimator_log.csv");
+    estimator_log << "vx,vy,vz,wx,wy,wz,rx,ry,rz,q0,q1,q2,q3\n";
 
     // quick hack to discard CSV data header
     std::string line;
@@ -124,6 +139,8 @@ int main(int argc, char *argv[])
                 break;
             }
         }
+
+        csv_write_line<MEKF::SystemState>(estimator_log, xs);
     }
     std::cout << "DONE" << std::endl;
 }
