@@ -101,11 +101,12 @@ int main(int argc, char *argv[])
     std::cout << "start simulation" << std::endl;
     for (double t = 0; t < SIM_TIME; t += h) {
         DM u = DM::vertcat({
-            // 0, // Flaps
-            // 0, // Aileron
-            DEG2RAD(3)*sin(2*M_PI*0.5*t), // Flaps
-            DEG2RAD(3)*sin(2*M_PI*0.5*t), // Aileron
-            DEG2RAD(3)*sin(2*M_PI*0.1*t), // Rudder
+            0, // Flaps
+            0, // Aileron
+            0, // Rudder
+            // DEG2RAD(3)*sin(2*M_PI*0.5*t), // Flaps
+            // DEG2RAD(3)*sin(2*M_PI*0.5*t), // Aileron
+            // DEG2RAD(3)*sin(2*M_PI*0.1*t), // Rudder
             0.8 // Thrust
         });
 

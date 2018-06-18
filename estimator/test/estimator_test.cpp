@@ -102,10 +102,10 @@ int main(int argc, char *argv[])
         estimator.update(u, z);
 
         xs = estimator.get_system_state();
-        std::cout << "xs = \n" << xs.transpose() << "\n";
+        std::cout << "xs  = " << xs.transpose() << "\n";
 
         run &= (csv_parse_line<MEKF::SystemState>(xs_sim, sim_x) == 0);
-        std::cout << "xs_sim = \n" << xs.transpose() << "\n";
+        std::cout << "sim = " << xs.transpose() << "\n";
 
         for (int i = 0; i < xs.size(); i++) {
             if (isnan(xs(i))) {
