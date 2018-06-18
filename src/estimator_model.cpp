@@ -84,21 +84,20 @@ EstimatorModel::EstimatorModel(BoatDynamics &dynamics, const BoatProperties &pro
     this->F_func = F_func;
 
     // Outputmap and Sensitivity
-    SX g = SX::vertcat({0, 0, -prop.env.g}); // in BRF: z = up
     SX r_ant = SX::vertcat({
         prop.sensor.r_ant[0],
         prop.sensor.r_ant[1],
         prop.sensor.r_ant[2]
     });
-    SX g_BRF = quatrot(q, g);
 
     // Velocity is in BRF
     SX y_vgns = quatrot_inverse(q, v) + quatrot_inverse(q, SX::mtimes(skew_mat(W), r_ant));
     SX y_wgyro = W + bg;
     SX y_rgns = r + quatrot_inverse(q, r_ant);
 
-    //y_acc = v_dot_BRF - quatrot(q,[0; g]) + ba;
-    SX y_acc = -quatrot(q, SX::vertcat({0,g})) + ba;
+    SX g = SX::vertcat({0, 0, prop.env.g}); // in BRF: z = down
+    SX g_BRF = quatrot(q, g);
+    SX y_acc = g_BRF + ba; // TODO: calculate v_dot_BRF ?
 
     // Complete Output-map h(x) and Output Sensitivity H
     SX h = SX::vertcat({y_vgns, y_wgyro, y_rgns, y_acc});
