@@ -42,6 +42,21 @@ target_link_libraries(
     yaml-cpp
     )
 
+# Boat model simulation
+add_executable(
+    simulation
+    src/simulation.cpp
+    src/boat_model.cpp
+    src/boat_properties.cpp
+    src/boat_math.cpp
+    )
+
+target_link_libraries(
+    simulation
+    casadi
+    yaml-cpp
+    )
+
 # CasADi tests
 add_executable(
     casadi_test
