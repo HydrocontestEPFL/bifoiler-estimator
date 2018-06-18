@@ -1,7 +1,6 @@
 #include <iostream>
 #include <fstream>
 #include <string>
-#include <stdio.h>
 
 #include <casadi/casadi.hpp>
 #include <boat_model.h>
@@ -89,6 +88,8 @@ int main(int argc, char *argv[])
     Dict opts = {{"tf", h}};
     Function CVODES_INT = integrator("CVODES_INT", "cvodes", ode, opts);
 
+    // TODO: compare to RK4
+
     const double SIM_TIME = 10; // [s]
     DM x = DM::vertcat({
         5, 0, 0,    // v0 [m/s] in BRF
@@ -116,6 +117,7 @@ int main(int argc, char *argv[])
         csv_write_line(sim_x, x);
         csv_write_line(sim_u, u);
         csv_write_line(sim_z, z);
+
         x = cvodes_solve(CVODES_INT, x, u);
     }
 

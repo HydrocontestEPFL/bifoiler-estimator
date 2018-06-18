@@ -1,21 +1,82 @@
 #include <iostream>
+#include <fstream>
+#include <string>
+#include <cmath>
+#include <random>
 #include <Eigen/Dense>
 
 #include "MEKF.h"
 #include "model.h"
+#include "covariance.h"
 
 using namespace bifoiler;
+using namespace Eigen;
 
-int main()
+// MEKF::Measurement add_noise(MEKF::Measurement z)
+// {
+//     static std::default_random_engine generator;
+//     static std::normal_distribution<double> noise(0, 1);
+// }
+
+template <typename vector>
+int csv_parse_line(vector &out, std::ifstream &in)
 {
+    std::string line;
+    if (!std::getline(in, line)) {
+        return -1;
+    }
+
+    std::stringstream ss(line);
+
+    unsigned i = 0;
+    double d;
+    while (ss >> d && i < out.size())
+    {
+        out(i) = d;
+
+        if (ss.peek() == ',') {
+            ss.ignore();
+        }
+        i++;
+    }
+    if (i != out.size()) {
+        std::cout << "CSV parse error: " << line << std::endl;
+        return -1;
+    }
+    return 0;
+}
+
+int main(int argc, char *argv[])
+{
+    if (argc < 2) {
+        std::cout << "usage: " << argv[0] << " path/to/csv/data" << std::endl;
+        return -1;
+    }
+
+    std::string sim_csv_path(argv[1]);
+    std::ifstream sim_x(sim_csv_path + "/sim_x.csv");
+    std::ifstream sim_u(sim_csv_path + "/sim_u.csv");
+    std::ifstream sim_z(sim_csv_path + "/sim_z.csv");
+
+    // quick hack to discard CSV data header
+    std::string line;
+    std::getline(sim_x, line);
+    std::getline(sim_u, line);
+    std::getline(sim_z, line);
+
+    MEKF::SystemState xs, xs_sim;
+    MEKF::EstimatorState xe;
+    MEKF::StateCov P;
+    MEKF::Control u;
+    MEKF::Measurement z;
+
     MEKF::SystemState x0;
     MEKF::StateCov P0;
 
     x0 << 5, 0, 0,    // v0 in BRF
           0, 0, 0,    // w0
-          0, 0, -0.2, // r0 in IRF (NED)
+          0, 0, 0,    // r0 in IRF (NED)
           1, 0, 0, 0; // q0
-    std::cout << "x0 = \n" << x0 << "\n";
 
     P0.setZero();
     P0.diagonal() << 0.3, 0.8, 0.5, // v
@@ -25,50 +86,34 @@ int main()
                      0.01, 0.01, 0.01, // bg
                      0.01, 0.01, 0.01; // ba
 
-    std::cout << "P0 = \n" << P0 << "\n";
 
-    std::cout << "estimator test\n";
+    bool run = true;
+    run &= (csv_parse_line<MEKF::SystemState>(x0, sim_x) == 0);
+
+    std::cout << "init MEKF" << std::endl;
     MEKF estimator(x0, P0);
 
-    MEKF::SystemState xs;
-    MEKF::EstimatorState xe;
-    MEKF::StateCov P;
+    while (run) {
+        run &= (csv_parse_line<MEKF::Control>(u, sim_u) == 0);
+        run &= (csv_parse_line<MEKF::Measurement>(z, sim_z) == 0);
+        // std::cout << "u = \n" << u.transpose() << "\n";
+        // std::cout << "z = \n" << z.transpose() << "\n";
 
-    xs = estimator.get_system_state();
-    std::cout << "xs = \n" << xs << "\n";
+        estimator.update(u, z);
 
-    MEKF::Control u;
-    MEKF::Measurement z;
+        xs = estimator.get_system_state();
+        std::cout << "xs = \n" << xs.transpose() << "\n";
 
+        run &= (csv_parse_line<MEKF::SystemState>(xs_sim, sim_x) == 0);
+        std::cout << "xs_sim = \n" << xs.transpose() << "\n";
 
-    u << 0, 0, 0, 0.8f; // Flaps, Aileron, Rudder, Thrust
-    z << 6, 0, 0, // v_B
-         0, 0, 0, // w_B
-         0.1, 0, 0, // r_I
-         0, 0, -9.81; // acc_B
-
-    std::cout << "estimator.predict(u)\n";
-    estimator.predict(u);
-
-    xs = estimator.get_system_state();
-    std::cout << "xs = \n" << xs << "\n";
-
-    xe = estimator.get_estimator_state();
-    std::cout << "xe = \n" << xe << "\n";
-
-    P = estimator.get_state_covariance();
-    std::cout << "P = \n" << P << "\n";
-
-    std::cout << "estimator.correct(u, z)\n";
-    estimator.correct(u, z);
-
-    xs = estimator.get_system_state();
-    std::cout << "xs = \n" << xs << "\n";
-
-    xe = estimator.get_estimator_state();
-    std::cout << "xe = \n" << xe << "\n";
-
-    P = estimator.get_state_covariance();
-    std::cout << "P = \n" << P << "\n";
-
+        for (int i = 0; i < xs.size(); i++) {
+            if (isnan(xs(i))) {
+                std::cout << "Nan" << std::endl;
+                run = false;
+                break;
+            }
+        }
+    }
+    std::cout << "DONE" << std::endl;
 }
