@@ -17,8 +17,8 @@ MEKF::Measurement add_noise(MEKF::Measurement z)
     static std::default_random_engine generator;
     static std::normal_distribution<double> noise(0, 1);
 
-    auto Q = measurement_noise_covariance<double>();
-    MEKF::Measurement variance = Q.diagonal();
+    auto R = measurement_noise_covariance<double>();
+    MEKF::Measurement variance = R.diagonal();
 
     for (int i = 0; i < z.size(); i++) {
         z(i) += sqrt(variance(i)) * noise(generator); // additive gaussian noise
