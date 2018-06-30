@@ -25,19 +25,25 @@ Dynamics::Dynamics()
 
 Dynamics::SystemState Dynamics::integrate(const SystemState &x, const Control &u)
 {
+    const unsigned N = 10;
     Scalar _x0[nxs], _u[nu], _dT[1], _x1[nxs];
 
     SystemState::Map(_x0) = x;
     Control::Map(_u) = u;
-    _dT[0] = 0.02; // TODO: parametrize
+    _dT[0] = 0.02 / N; // TODO: parametrize
 
     // Setup function arguments
     const Scalar *arg[3] = {_x0, _u, _dT};
     Scalar *res[1] = {_x1};
 
-    // call to CasADi generated C function
-    // integrator {13, 3, 1} -> {13}
-    integrator(&arg[0], &res[0], NULL, NULL, NULL);
+    for (unsigned i = 0; i < N; i++) {
+        // call to CasADi generated C function
+        // integrator {13, 3, 1} -> {13}
+        integrator(&arg[0], &res[0], NULL, NULL, NULL);
+
+        // copy output to input
+        SystemState::Map(_x0) = SystemState::Map(_x1);
+    }
 
     return SystemState::Map(_x1);
 }
