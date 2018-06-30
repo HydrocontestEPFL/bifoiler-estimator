@@ -1,6 +1,7 @@
 import pandas
 import argparse
 import matplotlib as mpl
+mpl.use('TkAgg') # faster backend
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
 import numpy as np
@@ -24,13 +25,21 @@ def main(args):
     y = data[:,1]
     z = data[:,2]
 
-    mpl.rcParams['legend.fontsize'] = 10
-
     fig = plt.figure(figsize=(10,6))
     ax = fig.gca(projection='3d')
 
     ax.plot(x, y, z, label='trajectory')
-    ax.plot(x, y, z[0]*np.ones(len(z)), label='projection-xy', linestyle=':', color='k')
+    # ax.plot(x, y, z[0]*np.ones(len(z)), label='projection-xy', linestyle=':', color='k')
+
+    if args.compare is not None:
+        df = pandas.read_csv(args.compare, sep=',')
+        data = df[['rx','ry', 'rz']].values;
+        x = data[:,0]
+        y = data[:,1]
+        z = data[:,2]
+        ax.plot(x, y, z, label='reference', linestyle='-', color='k')
+
+    mpl.rcParams['legend.fontsize'] = 10
     ax.legend()
 
     ax.set_xlabel('$r_x$ [m]')
@@ -49,6 +58,7 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('file')
+    parser.add_argument('--compare')
     parser.add_argument('--plot', action='store_true')
     args = parser.parse_args()
     main(args)
