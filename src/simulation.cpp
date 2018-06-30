@@ -40,6 +40,13 @@ DM cvodes_solve(Function &cvodes_integrator, const DM &x0, const DM &u)
     return out["xf"];
 }
 
+DM rk4_solve(Function &integrator, const DM &x0, const DM &u, const double h)
+{
+    DMVector arg = DMVector{x0,u,h};
+    auto out = integrator(arg);
+    return out[0];
+}
+
 DM h_func(Function h, DM xs, DM u)
 {
     DM qr = xs(Slice(9,13));
@@ -57,8 +64,13 @@ DM h_func(Function h, DM xs, DM u)
 int main(int argc, char *argv[])
 {
     if (argc < 2) {
-        std::cout << "usage: " << argv[0] << " config.yaml" << std::endl;
+        std::cout << "usage: " << argv[0] << " config.yaml [RK4|CVODES]" << std::endl;
         return -1;
+    }
+
+    std::string integrator_name = "RK4";
+    if (argc >= 3) {
+        integrator_name = argv[2];
     }
 
     std::ofstream sim_x("sim_x.csv");
@@ -87,8 +99,7 @@ int main(int argc, char *argv[])
     SXDict ode = {{"x", state}, {"p", control}, {"ode", dynamics}};
     Dict opts = {{"tf", h}};
     Function CVODES_INT = integrator("CVODES_INT", "cvodes", ode, opts);
-
-    // TODO: compare to RK4
+    Function RK4_INT = boat_model.getNumericIntegrator();
 
     const double SIM_TIME = 10; // [s]
     DM x = DM::vertcat({
@@ -119,7 +130,14 @@ int main(int argc, char *argv[])
         csv_write_line(sim_u, u);
         csv_write_line(sim_z, z);
 
-        x = cvodes_solve(CVODES_INT, x, u);
+        if (integrator_name == "CVODES") {
+            x = cvodes_solve(CVODES_INT, x, u);
+        } else if (integrator_name == "RK4") { // RK4
+            x = rk4_solve(RK4_INT, x, u, h);
+        } else {
+            std::cerr << "unknown integrator: " << integrator_name << std::endl;
+            return -1;
+        }
     }
 
     std::cout << "DONE" << std::endl;
