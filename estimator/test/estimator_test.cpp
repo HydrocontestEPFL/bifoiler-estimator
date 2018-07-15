@@ -12,13 +12,15 @@
 using namespace bifoiler;
 using namespace Eigen;
 
-MEKF::Measurement add_noise(MEKF::Measurement z)
+using KF = MEKF<Dynamics, Observation>;
+
+KF::Measurement add_noise(KF::Measurement z)
 {
     static std::default_random_engine generator;
     static std::normal_distribution<double> noise(0, 1);
 
     auto R = measurement_noise_covariance<double>();
-    MEKF::Measurement variance = R.diagonal();
+    KF::Measurement variance = R.diagonal();
 
     for (int i = 0; i < z.size(); i++) {
         z(i) += sqrt(variance(i)) * noise(generator); // additive gaussian noise
@@ -87,14 +89,14 @@ int main(int argc, char *argv[])
     std::getline(sim_u, line);
     std::getline(sim_z, line);
 
-    MEKF::SystemState xs, xs_sim;
-    MEKF::EstimatorState xe;
-    MEKF::StateCov P;
-    MEKF::Control u;
-    MEKF::Measurement z;
+    KF::SystemState xs, xs_sim;
+    KF::EstimatorState xe;
+    KF::StateCov P;
+    KF::Control u;
+    KF::Measurement z;
 
-    MEKF::SystemState x0;
-    MEKF::StateCov P0;
+    KF::SystemState x0;
+    KF::StateCov P0;
 
     x0 << 5, 0, 0,    // v0 in BRF
           0, 0, 0,    // w0
@@ -111,14 +113,14 @@ int main(int argc, char *argv[])
 
 
     bool run = true;
-    run &= (csv_parse_line<MEKF::SystemState>(x0, sim_x) == 0);
+    run &= (csv_parse_line<KF::SystemState>(x0, sim_x) == 0);
 
     std::cout << "init MEKF" << std::endl;
-    MEKF estimator(x0, P0);
+    KF estimator(x0, P0);
 
     while (run) {
-        run &= (csv_parse_line<MEKF::Control>(u, sim_u) == 0);
-        run &= (csv_parse_line<MEKF::Measurement>(z, sim_z) == 0);
+        run &= (csv_parse_line<KF::Control>(u, sim_u) == 0);
+        run &= (csv_parse_line<KF::Measurement>(z, sim_z) == 0);
         // std::cout << "u = \n" << u.transpose() << "\n";
         // std::cout << "z = \n" << z.transpose() << "\n";
 
@@ -129,7 +131,7 @@ int main(int argc, char *argv[])
         xs = estimator.get_system_state();
         std::cout << "xs  = " << xs.transpose() << "\n";
 
-        run &= (csv_parse_line<MEKF::SystemState>(xs_sim, sim_x) == 0);
+        run &= (csv_parse_line<KF::SystemState>(xs_sim, sim_x) == 0);
         std::cout << "sim = " << xs.transpose() << "\n";
 
         for (int i = 0; i < xs.size(); i++) {
@@ -140,7 +142,7 @@ int main(int argc, char *argv[])
             }
         }
 
-        csv_write_line<MEKF::SystemState>(estimator_log, xs);
+        csv_write_line<KF::SystemState>(estimator_log, xs);
     }
     std::cout << "DONE" << std::endl;
 }
